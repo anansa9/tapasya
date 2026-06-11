@@ -1,0 +1,1684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>Tapasya</title>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Tapasya"/>
+<meta name="theme-color" content="#0d1520"/>
+<link rel="manifest" id="pwa-manifest"/>
+<style>
+/* Space Grotesk system fallback – matches the geometric sans feel closely */
+@import url('data:text/css,');
+</style>
+<script>
+// ── INJECT PWA MANIFEST (inline blob) ────────────────────────────────────────
+(function(){
+  const manifest = {
+    name: "Tapasya",
+    short_name: "Tapasya",
+    description: "Goals, To-Do & Wishlist tracker",
+    start_url: "./",
+    display: "standalone",
+    background_color: "#0d1520",
+    theme_color: "#0d1520",
+    orientation: "portrait",
+    icons: [
+      { src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%230d1520'/><text x='96' y='130' font-size='100' text-anchor='middle'>🎯</text></svg>", sizes: "192x192", type: "image/svg+xml" },
+      { src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%230d1520'/><text x='256' y='340' font-size='280' text-anchor='middle'>🎯</text></svg>", sizes: "512x512", type: "image/svg+xml" }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
+  document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
+})();
+
+// ── REGISTER SERVICE WORKER (inline blob) ────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  const swCode = `
+const CACHE = 'tapasya-v1';
+// Cache the page itself on install
+self.addEventListener('install', e => {
+  self.skipWaiting();
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(['./', self.location.href]))
+  );
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(clients.claim());
+  // Clean old caches
+  e.waitUntil(caches.keys().then(keys =>
+    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+  ));
+});
+// Cache-first for same-origin, network-first for fonts/external
+self.addEventListener('fetch', e => {
+  const url = new URL(e.request.url);
+  // For Google Fonts or external, try network then fall back to cache
+  if (url.origin !== self.location.origin) {
+    e.respondWith(
+      fetch(e.request)
+        .then(r => { const rc = r.clone(); caches.open(CACHE).then(c => c.put(e.request, rc)); return r; })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+  // For local resources: cache-first
+  e.respondWith(
+    caches.match(e.request).then(cached => {
+      if (cached) return cached;
+      return fetch(e.request).then(r => {
+        const rc = r.clone();
+        caches.open(CACHE).then(c => c.put(e.request, rc));
+        return r;
+      });
+    })
+  );
+});
+`;
+  const swBlob = new Blob([swCode], {type: 'application/javascript'});
+  const swUrl = URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swUrl, {scope: './'})
+    .catch(e => console.warn('SW registration failed (blob scope limitation):', e));
+}
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#0d1520;color:#e2eaf4;font-family:'Space Grotesk','DM Sans','Outfit','Inter',system-ui,-apple-system,sans-serif;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button{font-family:'Space Grotesk','DM Sans','Outfit','Inter',system-ui,-apple-system,sans-serif;cursor:pointer}
+input,textarea{font-family:'Space Grotesk','DM Sans','Outfit','Inter',system-ui,-apple-system,sans-serif}
+::-webkit-scrollbar{display:none}
+#app{max-width:520px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;position:relative;background:#0d1520}
+
+/* ── TOP SECTION TABS ── */
+#section-tabs{display:flex;padding:max(env(safe-area-inset-top,12px),12px) 16px 0;background:#0d1520;gap:12px}
+.section-tab{flex:1;padding:14px 0 12px;background:transparent;border:none;font-size:22px;font-weight:800;letter-spacing:-.01em;color:#2d3f55;border-bottom:3px solid transparent;transition:all .2s;text-align:left;line-height:1.1}
+.section-tab.active{color:#f5a623;border-bottom-color:#f5a623}
+.section-tab .tab-sub{display:block;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;margin-top:2px;color:#3d5068}
+.section-tab.active .tab-sub{color:rgba(245,166,35,.6)}
+
+/* ── SUB HEADER ── */
+#sub-header{padding:10px 14px 12px;background:#0d1520;border-bottom:1px solid #1a2535;min-height:52px;display:flex;align-items:center;justify-content:space-between}
+
+/* ── CONTENT ── */
+#content{flex:1;overflow-y:auto;padding-top:12px;padding-bottom:90px}
+
+/* ── BOTTOM NAV ── */
+#bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;background:rgba(10,18,32,.97);border-top:1px solid #1a2535;display:flex;padding-bottom:max(env(safe-area-inset-bottom,4px),4px);z-index:20}
+.nav-item{flex:1;padding:10px 0 4px;background:transparent;border:none;display:flex;flex-direction:column;align-items:center;gap:3px}
+.nav-icon{font-size:20px;line-height:1}
+.nav-label{font-size:10px;font-weight:600;letter-spacing:.05em}
+.nav-dot{width:18px;height:2px;background:#f5a623;border-radius:2px}
+.nav-btn{width:28px;height:28px;border:1px solid #1e2f45;background:#101d2c;color:#b0c4de;border-radius:7px;font-size:18px;display:flex;align-items:center;justify-content:center;padding:0}
+
+/* ── GOALS: TODAY ── */
+.today-wrap{padding:0 14px}
+.today-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.today-date{font-size:19px;font-weight:700;letter-spacing:-.02em}
+.today-label{font-size:11px;color:#f5a623;margin-top:3px;letter-spacing:.08em;text-transform:uppercase}
+.seal-wrap{display:flex;flex-direction:column;align-items:center;gap:2px}
+.seal-sub{font-size:9px;color:#4a5568;text-transform:uppercase;letter-spacing:.07em}
+.goal-card{background:#101d2c;border:1.5px solid #1a2535;border-radius:14px;padding:13px 15px;display:flex;align-items:center;gap:13px;margin-bottom:9px;transition:border-color .2s,background .2s}
+.goal-card.done{background:rgba(245,166,35,.05)}
+.goal-icon{font-size:22px;flex-shrink:0}
+.goal-info{flex:1}
+.goal-name{font-size:13px;font-weight:600}
+.goal-status{font-size:11px;margin-top:3px;color:#4a5568}
+.tick-btn{width:42px;height:42px;border-radius:12px;border:2px solid #1e2f45;background:rgba(255,255,255,.04);color:#2d3f55;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+.tick-btn.done{border-color:#f5a623;background:rgba(245,166,35,.18);color:#f5a623}
+.wr-btn{min-width:56px;height:40px;border-radius:11px;border:2px solid #1e2f45;background:rgba(255,255,255,.04);color:#4a5568;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* ── GOALS: MATRIX ── */
+.matrix-wrap{padding-bottom:20px}
+.matrix-header{display:grid;grid-template-columns:90px repeat(7,1fr);padding:0 10px;border-bottom:1px solid #1a2535;margin-bottom:2px}
+.day-col-header{text-align:center;padding:9px 0 7px;position:relative}
+.day-col-header .dname{font-size:10px;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:.04em}
+.day-col-header .ddate{font-size:9px;color:#263040;margin-top:2px}
+.day-col-header.today .dname{color:#f5a623}
+.day-col-header.today .ddate{color:rgba(245,166,35,.7)}
+.day-col-header.today::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:#f5a623}
+.matrix-row{border-bottom:1px solid #131e2d}
+.matrix-row:nth-child(even){background:rgba(255,255,255,.015)}
+.matrix-cells{display:grid;grid-template-columns:90px repeat(7,1fr);padding:9px 10px 0;align-items:center}
+.goal-label-cell{padding-right:4px;display:flex;align-items:center;gap:5px}
+.goal-label-cell .gicon{font-size:13px}
+.goal-label-cell .gname{font-size:11px;font-weight:700;color:#e2eaf4;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62px}
+.goal-label-cell .gprog{font-size:9px;color:#4a5568;margin-top:1px}
+.goal-label-cell .gprog.met{color:#f5a623}
+.cell-wrap{display:flex;justify-content:center;align-items:center;padding:0 2px}
+.cell-btn{width:100%;max-width:38px;height:34px;border-radius:8px;border:1.5px solid #1a2535;background:transparent;color:#2d3f55;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .15s;padding:0}
+.cell-btn.today-col{border-color:#253650;background:rgba(255,255,255,.04)}
+.cell-btn.checked{border-color:#f5a623;background:rgba(245,166,35,.15);color:#f5a623}
+.cell-btn.wr{font-size:9px;font-weight:800}
+.prog-bar-wrap{padding:5px 10px 7px;padding-left:calc(90px + 10px)}
+.prog-bar-bg{background:#131e2d;border-radius:3px;height:3px;overflow:hidden}
+.prog-bar-fill{height:100%;border-radius:3px;transition:width .4s}
+
+/* ── GOALS: SUMMARY ── */
+.summary-wrap{padding:0 14px}
+.score-card{background:linear-gradient(135deg,#0d1f35,#101d2c);border:1.5px solid #1e2f45;border-radius:18px;padding:20px 16px;margin-bottom:12px;display:flex;align-items:center;gap:16px}
+.score-card-text .sc-label{font-size:11px;color:#7a8fa6;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px}
+.score-card-text .sc-pct{font-size:26px;font-weight:700;color:#f5a623;letter-spacing:-.02em}
+.score-card-text .sc-msg{font-size:12px;color:#b0c4de;margin-top:5px}
+.score-card-text .sc-range{font-size:10px;color:#4a5568;margin-top:4px}
+.sum-goal{background:#101d2c;border:1.5px solid #1a2535;border-radius:13px;padding:12px 14px;margin-bottom:9px}
+.sum-goal.met{border-color:rgba(245,166,35,.25)}
+.sum-goal-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sum-goal-left{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.sum-goal-left span{font-size:17px}
+.sum-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;color:#b0c4de;background:rgba(176,196,222,.08)}
+.sum-badge.met{color:#f5a623;background:rgba(245,166,35,.1)}
+.sum-pct{font-size:10px;color:#4a5568;margin-top:4px}
+
+/* ── WISHLIST ── */
+.wishlist-wrap{padding:0 14px}
+.wl-categories{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.wl-cat-btn{padding:6px 14px;border-radius:20px;border:1.5px solid #1e2f45;background:transparent;font-size:11px;font-weight:700;color:#4a5568;transition:all .15s;cursor:pointer}
+.wl-cat-btn.active{border-color:#a78bfa;background:rgba(167,139,250,0.12);color:#a78bfa}
+.wl-item{background:#101d2c;border:1.5px solid #1a2535;border-radius:14px;padding:14px 15px;display:flex;align-items:flex-start;gap:12px;margin-bottom:9px;transition:all .2s}
+.wl-item.bought{opacity:.55}
+.wl-check{width:26px;height:26px;border-radius:8px;border:2px solid #1e2f45;background:transparent;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#2d3f55;font-size:13px;transition:all .15s;cursor:pointer;margin-top:1px}
+.wl-check.checked{border-color:#a78bfa;background:rgba(167,139,250,0.18);color:#a78bfa}
+.wl-info{flex:1;min-width:0}
+.wl-name{font-size:13px;font-weight:600;color:#e2eaf4;transition:all .2s}
+.wl-item.bought .wl-name{text-decoration:line-through;color:#4a5568}
+.wl-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:5px;align-items:center}
+.wl-cat-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(167,139,250,0.12);color:#a78bfa}
+.wl-priority{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+.wl-priority.high{background:rgba(245,166,35,0.12);color:#f5a623}
+.wl-priority.medium{background:rgba(91,163,217,0.12);color:#5ba3d9}
+.wl-priority.low{background:rgba(122,143,166,0.1);color:#7a8fa6}
+.wl-note{font-size:11px;color:#4a5568;margin-top:4px;line-height:1.4}
+.wl-del{width:28px;height:28px;border-radius:8px;border:none;background:rgba(255,80,80,.06);color:#4a5568;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}
+.wl-del:active{background:rgba(255,80,80,.2);color:#ff5050}
+.wl-add-form{background:#101d2c;border:1.5px solid #1e2f45;border-radius:16px;padding:14px;margin-bottom:16px}
+.wl-add-form input,.wl-add-form textarea{width:100%;padding:9px 12px;background:#0d1520;border:1.5px solid #1e2f45;border-radius:10px;color:#e2eaf4;font-size:13px;outline:none;margin-bottom:8px;display:block;transition:border-color .15s}
+.wl-add-form input:focus,.wl-add-form textarea:focus{border-color:#a78bfa}
+.wl-add-form input::placeholder,.wl-add-form textarea::placeholder{color:#3d5068}
+.wl-add-form textarea{resize:none;height:60px;font-family:'Space Grotesk',sans-serif}
+.wl-form-row{display:flex;gap:8px;margin-bottom:8px}
+.wl-select{flex:1;padding:8px 10px;background:#0d1520;border:1.5px solid #1e2f45;border-radius:10px;color:#b0c4de;font-size:12px;font-weight:600;outline:none;font-family:'Space Grotesk',sans-serif}
+.wl-submit{width:100%;padding:11px;border-radius:11px;border:none;background:#a78bfa;color:#0d1520;font-size:13px;font-weight:700;cursor:pointer;font-family:'Space Grotesk',sans-serif}
+.wl-stats{display:flex;gap:10px;margin-bottom:16px}
+.wl-stat{flex:1;background:#101d2c;border:1.5px solid #1a2535;border-radius:12px;padding:10px 12px;text-align:center}
+.wl-stat .wls-num{font-size:20px;font-weight:700;color:#a78bfa}
+.wl-stat .wls-label{font-size:10px;color:#4a5568;text-transform:uppercase;letter-spacing:.07em;margin-top:2px}
+.wl-toggle-form{width:100%;padding:11px;border-radius:12px;border:1.5px dashed #1e2f45;background:transparent;color:#4a5568;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:14px;font-family:'Space Grotesk',sans-serif;transition:all .15s}
+.wl-toggle-form:active{border-color:#a78bfa;color:#a78bfa}
+
+/* ── LEGEND ── */
+.legend{margin:12px 10px 0;padding:10px 12px;background:#0a1220;border-radius:12px;border:1px solid #1a2535}
+.legend-title{font-size:10px;color:#4a5568;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.legend-items{display:flex;gap:7px;flex-wrap:wrap}
+.legend-chip{font-size:11px;font-weight:700;border-radius:8px;padding:3px 9px}
+
+/* ── TODO SECTION ── */
+.todo-wrap{padding:0 14px}
+
+/* Date strip */
+.date-strip{display:flex;align-items:center;gap:0;margin-bottom:16px;overflow-x:auto;padding-bottom:2px}
+.date-pill{display:flex;flex-direction:column;align-items:center;padding:8px 10px;border-radius:12px;border:1.5px solid transparent;background:transparent;min-width:46px;cursor:pointer;transition:all .15s;flex-shrink:0}
+.date-pill .dp-day{font-size:10px;font-weight:600;color:#4a5568;text-transform:uppercase;letter-spacing:.05em}
+.date-pill .dp-num{font-size:16px;font-weight:700;color:#4a5568;margin-top:2px}
+.date-pill.active{background:#101d2c;border-color:#f5a623}
+.date-pill.active .dp-day,.date-pill.active .dp-num{color:#f5a623}
+.date-pill.has-items .dp-num::after{content:'·';display:block;font-size:8px;color:#5ba3d9;text-align:center;margin-top:1px;line-height:1}
+
+/* Calendar picker */
+.cal-btn{display:flex;align-items:center;gap:6px;padding:7px 12px;background:#101d2c;border:1.5px solid #1e2f45;border-radius:10px;color:#b0c4de;font-size:12px;font-weight:600;white-space:nowrap}
+.cal-btn .cal-icon{font-size:15px}
+
+/* Calendar modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.modal-box{background:#0d1f35;border-radius:20px 20px 0 0;padding:20px 16px max(env(safe-area-inset-bottom,16px),16px);width:100%;max-width:520px;border-top:1px solid #1e2f45}
+.modal-title{font-size:14px;font-weight:700;color:#e2eaf4;margin-bottom:16px;text-align:center}
+.cal-grid-header{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:8px}
+.cal-grid-header>div{text-align:center;font-size:10px;font-weight:700;color:#4a5568;text-transform:uppercase;padding:4px 0}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-day-btn{padding:8px 0;border-radius:8px;border:none;background:transparent;color:#b0c4de;font-size:13px;font-weight:600;text-align:center;cursor:pointer;transition:all .15s}
+.cal-day-btn:empty{cursor:default}
+.cal-day-btn.today{color:#f5a623;border:1.5px solid rgba(245,166,35,.3)}
+.cal-day-btn.selected{background:#f5a623;color:#0d1520}
+.cal-day-btn.has-items{position:relative}
+.cal-day-btn.has-items::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:#5ba3d9}
+.cal-month-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.cal-month-nav .cmnav-btn{width:32px;height:32px;border:1px solid #1e2f45;background:#101d2c;color:#b0c4de;border-radius:8px;font-size:18px;display:flex;align-items:center;justify-content:center;padding:0}
+.cal-month-nav .cmnav-label{font-size:14px;font-weight:700;color:#e2eaf4}
+.modal-close{width:100%;padding:12px;background:transparent;border:1.5px solid #1e2f45;border-radius:12px;color:#7a8fa6;font-size:13px;font-weight:600;margin-top:14px}
+
+/* Task sections */
+.tasks-section{margin-bottom:18px}
+.tasks-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.tasks-section-title{font-size:11px;font-weight:700;color:#7a8fa6;text-transform:uppercase;letter-spacing:.1em}
+.tasks-count{font-size:10px;color:#4a5568}
+
+/* Task item */
+.task-item{background:#101d2c;border:1.5px solid #1a2535;border-radius:13px;padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:8px;transition:all .2s}
+.task-item.done-task{opacity:.6}
+.task-check{width:24px;height:24px;border-radius:7px;border:2px solid #1e2f45;background:transparent;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#2d3f55;font-size:13px;transition:all .15s;cursor:pointer}
+.task-check.checked{border-color:#f5a623;background:rgba(245,166,35,.18);color:#f5a623}
+.task-check.recurring-done{border-color:#50c878;background:rgba(80,200,120,.15);color:#50c878}
+.task-text-wrap{flex:1;min-width:0}
+.task-text{font-size:13px;font-weight:500;color:#e2eaf4;transition:all .2s}
+.task-item.done-task .task-text{text-decoration:line-through;color:#4a5568}
+.task-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;margin-top:3px;display:inline-block}
+.task-badge.recurring{background:rgba(91,163,217,.15);color:#5ba3d9}
+.task-badge.oneoff{background:rgba(176,196,222,.08);color:#4a5568}
+.task-del{width:28px;height:28px;border-radius:8px;border:none;background:rgba(255,80,80,.08);color:#4a5568;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+.task-del:active{background:rgba(255,80,80,.2);color:#ff5050}
+
+/* Add task */
+.add-task-row{display:flex;gap:8px;margin-bottom:8px}
+.add-task-input{flex:1;padding:11px 14px;background:#101d2c;border:1.5px solid #1e2f45;border-radius:12px;color:#e2eaf4;font-size:13px;outline:none;transition:border-color .15s}
+.add-task-input:focus{border-color:#f5a623}
+.add-task-input::placeholder{color:#3d5068}
+.add-task-btn{width:44px;height:44px;border-radius:12px;border:none;background:#f5a623;color:#0d1520;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.add-type-toggle{display:flex;gap:6px;margin-bottom:14px}
+.type-btn{flex:1;padding:7px 0;border-radius:9px;border:1.5px solid #1e2f45;background:transparent;font-size:11px;font-weight:700;color:#4a5568;transition:all .15s}
+.type-btn.active{border-color:#5ba3d9;background:rgba(91,163,217,.12);color:#5ba3d9}
+.type-btn.active.oneoff{border-color:#7a8fa6;background:rgba(122,143,166,.1);color:#b0c4de}
+
+/* Empty state */
+.empty-state{text-align:center;padding:32px 20px;color:#2d3f55;font-size:13px}
+.empty-state .ei{font-size:32px;margin-bottom:10px}
+
+/* Week score small */
+.week-score-small{text-align:right}
+.week-score-small .wslabel{font-size:10px;color:#4a5568;text-transform:uppercase;letter-spacing:.07em}
+.week-score-small .wspct{font-size:15px;font-weight:700}
+.week-nav{display:flex;align-items:center;gap:8px}
+.week-nav-info{text-align:center;min-width:110px}
+.week-nav-info .wrange{font-size:11px;color:#b0c4de;font-weight:600}
+.week-nav-info .wcurrent{font-size:10px;color:#f5a623;margin-top:1px}
+
+/* ── MANAGE HABITS MODAL ── */
+.mh-item{background:#0d1520;border:1.5px solid #1e2f45;border-radius:13px;padding:11px 12px;display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.mh-drag{color:#2d3f55;font-size:16px;cursor:grab;padding:0 2px;flex-shrink:0;touch-action:none;user-select:none}
+.mh-drag:active{cursor:grabbing}
+.mh-icon-btn{width:38px;height:38px;border-radius:10px;border:1.5px solid #1e2f45;background:#101d2c;font-size:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}
+.mh-label{flex:1;font-size:13px;font-weight:600;color:#e2eaf4;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mh-target{width:36px;text-align:center;padding:6px 0;background:#101d2c;border:1.5px solid #1e2f45;border-radius:9px;color:#f5a623;font-size:13px;font-weight:700;outline:none}
+.mh-del{width:30px;height:30px;border-radius:8px;border:none;background:rgba(255,80,80,.07);color:#4a5568;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}
+.mh-del:active{background:rgba(255,80,80,.22);color:#ff5050}
+.mh-add-row{display:flex;gap:8px;margin-top:10px;align-items:center}
+.mh-add-icon{width:44px;height:44px;border-radius:11px;border:1.5px solid #1e2f45;background:#101d2c;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.mh-add-input{flex:1;padding:10px 12px;background:#101d2c;border:1.5px solid #1e2f45;border-radius:11px;color:#e2eaf4;font-size:13px;outline:none}
+.mh-add-input:focus{border-color:#f5a623}
+.mh-add-input::placeholder{color:#3d5068}
+.mh-add-btn{width:44px;height:44px;border-radius:11px;border:none;background:#f5a623;color:#0d1520;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}
+.mh-section-title{font-size:11px;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:.1em;margin:14px 0 8px}
+/* Emoji picker */
+.ep-overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-end;justify-content:center}
+.ep-box{background:#0d1f35;border-radius:20px 20px 0 0;padding:16px 12px max(env(safe-area-inset-bottom,16px),16px);width:100%;max-width:520px;border-top:1px solid #1e2f45;max-height:70vh;display:flex;flex-direction:column}
+.ep-search{width:100%;padding:9px 12px;background:#0d1520;border:1.5px solid #1e2f45;border-radius:11px;color:#e2eaf4;font-size:14px;outline:none;margin-bottom:12px;box-sizing:border-box}
+.ep-search:focus{border-color:#f5a623}
+.ep-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;overflow-y:auto;flex:1}
+.ep-btn{padding:6px 0;border-radius:8px;border:none;background:transparent;font-size:22px;cursor:pointer;text-align:center;transition:background .1s}
+.ep-btn:active{background:#1a2535}
+.mh-modal-box{max-height:80vh;overflow-y:auto}
+.mh-modal-box::-webkit-scrollbar{display:none}
+.mh-item.dragging{opacity:.4;border-style:dashed}
+.mh-item.drag-over{border-color:#f5a623;background:#101d2c}
+
+/* ── TICK STATES: missed (x) and NA ── */
+.tick-btn.missed{border-color:#ff5050;background:rgba(255,80,80,.15);color:#ff5050}
+.tick-btn.skipped{border-color:#4a5568;background:rgba(74,85,104,.18);color:#7a8fa6}
+.cell-btn.missed{border-color:#ff5050;background:rgba(255,80,80,.13);color:#ff5050}
+.cell-btn.skipped{border-color:#2d3f55;background:rgba(45,63,85,.18);color:#4a5568}
+
+/* ── STATE DROPDOWN ── */
+.state-drop-overlay{position:fixed;inset:0;z-index:60;background:transparent}
+.state-drop{position:fixed;z-index:61;background:#0d1f35;border:1.5px solid #1e2f45;border-radius:14px;padding:6px;min-width:150px;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+.state-drop-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;border:none;background:transparent;width:100%;cursor:pointer;font-size:13px;font-weight:600;color:#b0c4de;font-family:inherit;text-align:left}
+.state-drop-item:active{background:#1a2535}
+.state-drop-item .sdi-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="section-tabs"></div>
+  <div id="sub-header"></div>
+  <div id="content"></div>
+  <div id="bottom-nav"></div>
+  <div id="modal-root"></div>
+</div>
+
+<script>
+// ── GOALS CONFIG ─────────────────────────────────────────────────────────────
+const DEFAULT_GOALS = [
+  {id:"naam_jap",       label:"Naam Jap",      target:5, icon:"🕉️"},
+  {id:"deep_breathing", label:"Deep Breathing", target:5, icon:"🌬️"},
+  {id:"workout",        label:"Workout",         target:4, icon:"💪"},
+  {id:"walk_run",       label:"Walk / Run",      target:5, icon:"🏃", multiMode:true},
+  {id:"study",          label:"Study",           target:4, icon:"📖"},
+  {id:"book_reading",   label:"Book Reading",    target:4, icon:"📚"},
+];
+function loadGoals(){ try{ const g=JSON.parse(localStorage.getItem('tapasya:goals:config')); return (g&&g.length)?g:JSON.parse(JSON.stringify(DEFAULT_GOALS)); }catch{ return JSON.parse(JSON.stringify(DEFAULT_GOALS)); } }
+function saveGoals(g){ try{ localStorage.setItem('tapasya:goals:config',JSON.stringify(g)); }catch{} }
+let GOALS = loadGoals();
+const DAYS_FULL  = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const DAYS_SHORT = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+const WR_STATES  = [null,"walk","run","both","x","na"];
+const WR_META    = {
+  walk:{label:"Walk",      short:"W",   color:"#5ba3d9",bg:"rgba(91,163,217,0.18)"},
+  run: {label:"Run",       short:"R",   color:"#50c878",bg:"rgba(80,200,120,0.18)"},
+  both:{label:"Walk + Run",short:"W+R", color:"#f5a623",bg:"rgba(245,166,35,0.18)"},
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+const today = new Date();
+let state = {
+  section: "goals",         // "goals" | "todo"
+  goalsTab: "today",        // "today" | "week" | "stats"
+  viewDayIdx: null,          // null = always use today; number = browsing a specific day
+  weekKey: getWeekKey(today),
+  ticks: {},
+  todoDate: dateKey(today), // "YYYY-MM-DD"
+  calOpen: false,
+  calMonth: today.getMonth(),
+  calYear: today.getFullYear(),
+  addType: "recurring",     // "recurring" | "oneoff"
+  addText: "",
+};
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function pad(n){ return String(n).padStart(2,'0'); }
+function dateKey(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function parseDateKey(k){ const [y,m,d]=k.split('-').map(Number); return new Date(y,m-1,d); }
+function getWeekKey(date){
+  const d=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+  const day=d.getDay(), diff=d.getDate()-day+(day===0?-6:1);
+  d.setDate(diff);
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+}
+function parseWeekKey(wk){ const [y,m,d]=wk.split('-').map(Number); return new Date(y,m-1,d); }
+function getWeekDates(wk){
+  const s=parseWeekKey(wk);
+  return Array.from({length:7},(_,i)=>{ const d=new Date(s); d.setDate(s.getDate()+i); return d; });
+}
+function fmtDate(date){ return date.getDate()+' '+date.toLocaleString("default",{month:"short"}); }
+function fmtDateFull(date){ return DAYS_FULL[date.getDay()===0?6:date.getDay()-1]+', '+fmtDate(date); }
+function todayDayIdx(){ const d=new Date().getDay(); return d===0?6:d-1; }
+function todayKey(){ return dateKey(new Date()); }
+function isToday(dk){ return dk===todayKey(); }
+
+function el(tag,attrs,children){
+  const e=document.createElement(tag);
+  if(attrs) Object.entries(attrs).forEach(([k,v])=>{
+    if(k==='style'&&typeof v==='object'){Object.assign(e.style,v)}
+    else if(k==='class'){e.className=v}
+    else{ e.setAttribute(k,v); }
+  });
+  if(children)(Array.isArray(children)?children:[children]).forEach(c=>{
+    if(c==null||c===false)return;
+    e.appendChild(typeof c==='string'?document.createTextNode(c):c);
+  });
+  return e;
+}
+
+// ── STORAGE ───────────────────────────────────────────────────────────────────
+function loadTicks(wk){ try{ return JSON.parse(localStorage.getItem('tapasya:goals:'+wk))||{}; }catch{ return {}; } }
+function saveTicks(wk,t){ try{ localStorage.setItem('tapasya:goals:'+wk,JSON.stringify(t)); }catch{} }
+
+// Todo storage: { recurring:[{id,text}], days:{"YYYY-MM-DD":{done:{id:bool}, oneoff:[{id,text,done}]}} }
+function loadTodo(){ try{ return JSON.parse(localStorage.getItem('tapasya:todo'))||{recurring:[],days:{}}; }catch{ return {recurring:[],days:{}}; } }
+function saveTodo(t){ try{ localStorage.setItem('tapasya:todo',JSON.stringify(t)); }catch{} }
+function genId(){ return Math.random().toString(36).slice(2,9); }
+
+
+// ── TICK VALUE HELPERS ────────────────────────────────────────────────────────
+// Values: null=empty, true=done, 'x'=missed, 'na'=planned skip
+function getTickVal(ticks, goalId, dayIdx){
+  return ticks[`${goalId}:${dayIdx}`] ?? null;
+}
+function setTickVal(ticks, goalId, dayIdx, val){
+  if(val === null) delete ticks[`${goalId}:${dayIdx}`];
+  else ticks[`${goalId}:${dayIdx}`] = val;
+}
+function cycleTickVal(cur){ // null → true (done) → 'x' (missed) → 'na' → null
+  if(cur === null || cur === undefined) return true;
+  if(cur === true) return 'x';
+  if(cur === 'x') return 'na';
+  return null; // 'na' → clear
+}
+// For scoring: only true counts as done; x and na do NOT count
+function isDone(ticks,goalId,dayIdx){
+  if(goalId==="walk_run") return !!ticks[`walk_run:${dayIdx}`] && ticks[`walk_run:${dayIdx}`]!=='x' && ticks[`walk_run:${dayIdx}`]!=='na';
+  const v = ticks[`${goalId}:${dayIdx}`];
+  return v === true;
+}
+// Scoring: NA days are excluded from target denominator
+function goalProgress(ticks, goalId, target){
+  let done=0, naCount=0;
+  for(let i=0;i<7;i++){
+    const v = goalId==='walk_run' ? ticks[`walk_run:${i}`]??null : (ticks[`${goalId}:${i}`]??null);
+    if(v===true||(v&&v!=='x'&&v!=='na')) done++;
+    else if(v==='na') naCount++;
+  }
+  const effectiveTarget = Math.max(1, target - naCount);
+  return {count:done, naCount, pct:Math.min(Math.round(done/effectiveTarget*100),100)};
+}
+
+// ── STATE DROPDOWN ────────────────────────────────────────────────────────────
+let _dropTimer=null;
+function showStateDropdown(e, goalId, dayIdx, isWR, anchorEl){
+  e.preventDefault(); e.stopPropagation();
+  closeStateDropdown();
+
+  const STATE_OPTIONS = isWR ? [
+    {val:null,   label:'Clear',   icon:'○', color:'#2d3f55', bg:'#2d3f55'},
+    {val:'walk', label:'Walk',    icon:'W', color:'#5ba3d9', bg:'#5ba3d9'},
+    {val:'run',  label:'Run',     icon:'R', color:'#50c878', bg:'#50c878'},
+    {val:'both', label:'Walk+Run',icon:'W+R',color:'#f5a623',bg:'#f5a623'},
+    {val:'x',    label:'Missed',  icon:'✕', color:'#ff5050', bg:'#ff5050'},
+    {val:'na',   label:'N/A',     icon:'—', color:'#4a5568', bg:'#4a5568'},
+  ] : [
+    {val:null,   label:'Clear',   icon:'○', color:'#2d3f55', bg:'#2d3f55'},
+    {val:true,   label:'Done',    icon:'✓', color:'#f5a623', bg:'#f5a623'},
+    {val:'x',    label:'Missed',  icon:'✕', color:'#ff5050', bg:'#ff5050'},
+    {val:'na',   label:'N/A',     icon:'—', color:'#4a5568', bg:'#4a5568'},
+  ];
+
+  const rect = anchorEl.getBoundingClientRect();
+  const drop = document.createElement('div');
+  drop.className = 'state-drop';
+  drop.id = 'state-drop';
+
+  // Position: prefer below, flip up if near bottom
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const dropH = STATE_OPTIONS.length * 44 + 12;
+  let top = spaceBelow > dropH ? rect.bottom + 6 : rect.top - dropH - 6;
+  let left = Math.min(rect.left, window.innerWidth - 170);
+  drop.style.top = top + 'px';
+  drop.style.left = left + 'px';
+
+  STATE_OPTIONS.forEach(opt => {
+    const item = document.createElement('button');
+    item.className = 'state-drop-item';
+    item.innerHTML = `<span class="sdi-dot" style="background:${opt.bg};opacity:${opt.val===null?0.3:0.85}"></span><span>${opt.icon}</span><span>${opt.label}</span>`;
+    item.addEventListener('click', ev => {
+      ev.stopPropagation();
+      closeStateDropdown();
+      if(isWR){
+        state.ticks[`walk_run:${dayIdx}`] = opt.val;
+        if(opt.val===null) delete state.ticks[`walk_run:${dayIdx}`];
+      } else {
+        setTickVal(state.ticks, goalId, dayIdx, opt.val);
+      }
+      saveTicks(state.weekKey, state.ticks);
+      render();
+    });
+    drop.appendChild(item);
+  });
+
+  // Backdrop to close
+  const overlay = document.createElement('div');
+  overlay.className = 'state-drop-overlay';
+  overlay.id = 'state-drop-overlay';
+  overlay.addEventListener('click', closeStateDropdown);
+  overlay.addEventListener('touchstart', closeStateDropdown);
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(drop);
+}
+function closeStateDropdown(){
+  document.getElementById('state-drop')?.remove();
+  document.getElementById('state-drop-overlay')?.remove();
+}
+function attachTickHandlers(btn, goalId, dayIdx, isWR){
+  // Short tap = simple cycle (done/undone for normal; WR cycle for walk_run)
+  let pressTimer = null;
+  const onLong = (e) => { showStateDropdown(e, goalId, dayIdx, isWR, btn); };
+
+  btn.addEventListener('mousedown', () => { pressTimer = setTimeout(() => onLong({preventDefault:()=>{},stopPropagation:()=>{}}), 500); });
+  btn.addEventListener('mouseup',   () => clearTimeout(pressTimer));
+  btn.addEventListener('mouseleave',() => clearTimeout(pressTimer));
+  btn.addEventListener('touchstart',() => { pressTimer = setTimeout(() => onLong({preventDefault:()=>{},stopPropagation:()=>{}}), 500); }, {passive:true});
+  btn.addEventListener('touchend',  () => clearTimeout(pressTimer));
+  btn.addEventListener('touchmove', () => clearTimeout(pressTimer));
+
+  btn.addEventListener('click', () => {
+    clearTimeout(pressTimer);
+    if(isWR){ handleWRTap(dayIdx); return; }
+    const cur = getTickVal(state.ticks, goalId, dayIdx);
+    setTickVal(state.ticks, goalId, dayIdx, cycleTickVal(cur));
+    saveTicks(state.weekKey, state.ticks); render();
+  });
+}
+
+// weekScore uses updated goalProgress above
+function weekScore(ticks){
+  let total=0,earned=0;
+  GOALS.forEach(g=>{
+    const {count,naCount}=goalProgress(ticks,g.id,g.target);
+    total+=Math.max(1,g.target-naCount); earned+=Math.min(count,Math.max(1,g.target-naCount));
+  });
+  return total===0?0:Math.round(earned/total*100);
+}
+
+// ── SEAL SVG ──────────────────────────────────────────────────────────────────
+function makeSeal(pct,size){
+  size=size||88;
+  const r=size*0.38,circ=2*Math.PI*r,sw=size*0.095;
+  const off=circ*(1-Math.min(pct,100)/100);
+  const color=pct>=100?"#f5a623":pct>=85?"#e8c06a":pct>=70?"#b0c4de":pct>=50?"#5ba3d9":"#4a5568";
+  const grade=pct>=100?"S":pct>=85?"A":pct>=70?"B":pct>=50?"C":"D";
+  const cx=size/2,cy=size/2;
+  const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+  svg.setAttribute("width",size);svg.setAttribute("height",size);
+  svg.setAttribute("viewBox",`0 0 ${size} ${size}`);svg.style.display="block";
+  function circ2(ex){ const c=document.createElementNS("http://www.w3.org/2000/svg","circle"); Object.entries(ex).forEach(([k,v])=>c.setAttribute(k,v)); return c; }
+  function txt(t,y,fs,fill,fw){
+    const e=document.createElementNS("http://www.w3.org/2000/svg","text");
+    e.setAttribute("x",cx);e.setAttribute("y",y);e.setAttribute("text-anchor","middle");
+    e.setAttribute("fill",fill);e.setAttribute("font-size",fs);e.setAttribute("font-weight",fw||"700");
+    e.setAttribute("font-family","'Space Grotesk',sans-serif");e.textContent=t;return e;
+  }
+  svg.appendChild(circ2({cx,cy,r,fill:"none",stroke:"#1e2a3a","stroke-width":sw}));
+  const arc=circ2({cx,cy,r,fill:"none",stroke:color,"stroke-width":sw,"stroke-dasharray":circ,"stroke-dashoffset":off,"stroke-linecap":"round",transform:`rotate(-90 ${cx} ${cy})`});
+  arc.style.transition="stroke-dashoffset 0.6s ease,stroke 0.4s";
+  svg.appendChild(arc);
+  svg.appendChild(txt(grade,cy-2,size*0.22,color));
+  svg.appendChild(txt(Math.round(pct)+'%',cy+size*0.155,size*0.115,"#7a8fa6","400"));
+  return svg;
+}
+
+// ── WR DEBOUNCE ───────────────────────────────────────────────────────────────
+const wrLastTouch={};
+function handleWRTap(dayIdx){
+  const now=Date.now();
+  if(now-(wrLastTouch[dayIdx]||0)<500)return;
+  wrLastTouch[dayIdx]=now;
+  const cur=state.ticks[`walk_run:${dayIdx}`]||null;
+  state.ticks[`walk_run:${dayIdx}`]=WR_STATES[(WR_STATES.indexOf(cur)+1)%WR_STATES.length];
+  saveTicks(state.weekKey,state.ticks);render();
+}
+let todayWRLast=0;
+function handleTodayWRTap(tIdx){
+  const now=Date.now();if(now-todayWRLast<500)return;todayWRLast=now;handleWRTap(tIdx);
+}
+
+// ── RENDER: SECTION TABS ──────────────────────────────────────────────────────
+function renderSectionTabs(){
+  const t=document.getElementById('section-tabs');t.innerHTML='';
+  [
+    {id:'goals',    icon:'🎯', title:'Goals',    sub:'Habit Tracking'},
+    {id:'todo',     icon:'✅', title:'To-Do',    sub:'Daily Tasks'},
+    {id:'wishlist', icon:'🌟', title:'Wishlist', sub:'Dreams + Goals'},
+  ].forEach(s=>{
+    const btn=el('button',{class:'section-tab'+(state.section===s.id?' active':'')});
+    btn.innerHTML=s.icon+' '+s.title+'<span class="tab-sub">'+s.sub+'</span>';
+    btn.addEventListener('click',()=>{ state.section=s.id; render(); });
+    t.appendChild(btn);
+  });
+}
+
+// ── RENDER: SUB HEADER ────────────────────────────────────────────────────────
+function renderSubHeader(){
+  const sh=document.getElementById('sub-header');sh.innerHTML='';
+  if(state.section==='goals'){
+    if(state.goalsTab==='today'){
+      const ws=weekScore(state.ticks);
+      const wsColor=ws>=100?"#f5a623":ws>=70?"#b0c4de":"#4a5568";
+      const manageBtn=el('button',{class:'nav-btn',style:{marginRight:'auto',fontSize:'14px',width:'34px',height:'34px'}},'⚙️');
+      manageBtn.title='Manage Habits';
+      manageBtn.addEventListener('click',()=>{ state.manageHabitsOpen=true; render(); });
+      sh.appendChild(manageBtn);
+      sh.appendChild(el('div',{class:'week-score-small'},[
+        el('div',{class:'wslabel'},'Week Score'),
+        el('div',{class:'wspct',style:{color:wsColor}},Math.round(ws)+'%'),
+      ]));
+      sh.style.justifyContent='space-between';
+    } else {
+      sh.style.justifyContent='space-between';
+      const isCurrentWeek=state.weekKey===getWeekKey(new Date());
+      const weekDates=getWeekDates(state.weekKey);
+      const nav=el('div',{class:'week-nav'});
+      const prev=el('button',{class:'nav-btn'},'‹');
+      prev.addEventListener('click',()=>{
+        const d=parseWeekKey(state.weekKey);d.setDate(d.getDate()-7);
+        state.weekKey=getWeekKey(d);state.ticks=loadTicks(state.weekKey);render();
+      });
+      const next=el('button',{class:'nav-btn'},'›');
+      next.addEventListener('click',()=>{
+        const d=parseWeekKey(state.weekKey);d.setDate(d.getDate()+7);
+        state.weekKey=getWeekKey(d);state.ticks=loadTicks(state.weekKey);render();
+      });
+      const info=el('div',{class:'week-nav-info'},[el('div',{class:'wrange'},fmtDate(weekDates[0])+' – '+fmtDate(weekDates[6]))]);
+      if(isCurrentWeek)info.appendChild(el('div',{class:'wcurrent'},'This week'));
+      nav.appendChild(prev);nav.appendChild(info);nav.appendChild(next);
+      sh.appendChild(nav);
+    }
+  } else if(state.section==='wishlist'){
+    sh.style.justifyContent='space-between';
+    const total=loadWishlist().length;
+    const bought=loadWishlist().filter(w=>w.bought).length;
+    sh.appendChild(el('div',{},[
+      el('div',{style:{fontSize:'13px',fontWeight:'700',color:'#e2eaf4'}},'Your Wishlist'),
+      el('div',{style:{fontSize:'10px',color:'#4a5568',marginTop:'2px'}},bought+' of '+total+' acquired'),
+    ]));
+    const addBtn=el('button',{class:'cal-btn',style:{borderColor:'#a78bfa33',color:'#a78bfa'}});
+    addBtn.innerHTML='<span>✨</span> Add Item';
+    addBtn.addEventListener('click',()=>{ state.wlFormOpen=!state.wlFormOpen; render(); });
+    sh.appendChild(addBtn);
+  } else {
+    // Todo sub-header: selected date label + calendar button
+    sh.style.justifyContent='space-between';
+    const selDate=parseDateKey(state.todoDate);
+    const label=el('div',{},[
+      el('div',{style:{fontSize:'15px',fontWeight:'700',color:'#e2eaf4'}},
+        isToday(state.todoDate)?'Today — '+fmtDate(selDate):fmtDateFull(selDate)),
+      el('div',{style:{fontSize:'10px',color:'#4a5568',marginTop:'2px',textTransform:'uppercase',letterSpacing:'.07em'}},
+        isToday(state.todoDate)?'':'Tap calendar to jump'),
+    ]);
+    const calBtn=el('button',{class:'cal-btn'});
+    calBtn.innerHTML='<span class="cal-icon">📅</span> '+selDate.toLocaleString("default",{month:"short"})+' '+selDate.getFullYear();
+    calBtn.addEventListener('click',()=>{ state.calOpen=true; render(); });
+    sh.appendChild(label);sh.appendChild(calBtn);
+  }
+}
+
+// ── RENDER: BOTTOM NAV ────────────────────────────────────────────────────────
+function renderBottomNav(){
+  const bn=document.getElementById('bottom-nav');bn.innerHTML='';
+  let tabs, getActive, setActive, dotColor='#f5a623';
+  if(state.section==='goals'){
+    tabs=[{id:'today',icon:'☀️',label:'Today'},{id:'week',icon:'📅',label:'Week'},{id:'stats',icon:'📊',label:'Summary'}];
+    getActive=t=>state.goalsTab===t.id; setActive=t=>{ state.goalsTab=t.id; if(t.id==='today'){ state.viewDayIdx=null; } };
+  } else if(state.section==='todo'){
+    tabs=[{id:'all',icon:'📋',label:'All'},{id:'pending',icon:'⏳',label:'Pending'},{id:'done',icon:'✅',label:'Done'}];
+    getActive=t=>(state.todoFilter||'all')===t.id; setActive=t=>{ state.todoFilter=t.id; };
+  } else {
+    tabs=[{id:'all',icon:'🌟',label:'All'},{id:'pending',icon:'💭',label:'Pending'},{id:'bought',icon:'✅',label:'Acquired'}];
+    getActive=t=>(state.wlFilter||'all')===t.id; setActive=t=>{ state.wlFilter=t.id; };
+    dotColor='#a78bfa';
+  }
+  tabs.forEach(t=>{
+    const active=getActive(t);
+    const btn=el('button',{class:'nav-item'});
+    btn.appendChild(el('span',{class:'nav-icon',style:{filter:active?'none':'grayscale(0.6) opacity(0.45)'}},t.icon));
+    btn.appendChild(el('span',{class:'nav-label',style:{color:active?dotColor:'#3d5068'}},t.label));
+    if(active){ const dot=el('div',{class:'nav-dot'}); dot.style.background=dotColor; btn.appendChild(dot); }
+    btn.addEventListener('click',()=>{ setActive(t); render(); });
+    bn.appendChild(btn);
+  });
+}
+
+// ── RENDER: GOALS TODAY ───────────────────────────────────────────────────────
+function renderGoalsToday(){
+  const realTodayIdx=todayDayIdx();
+  // viewDayIdx: null or undefined means "today"; otherwise use the stored value
+  if(state.viewDayIdx===null||state.viewDayIdx===undefined) state.viewDayIdx=realTodayIdx;
+  const tIdx=state.viewDayIdx;
+  const isViewingToday=(tIdx===realTodayIdx && state.weekKey===getWeekKey(new Date()));
+  const ws=weekScore(state.ticks);
+  const weekDates=getWeekDates(state.weekKey);
+  const wrap=el('div',{class:'today-wrap'});
+  const sealWrap=el('div',{class:'seal-wrap'});
+  sealWrap.appendChild(makeSeal(ws,66));
+  sealWrap.appendChild(el('div',{class:'seal-sub'},'Week'));
+
+  // Nav row: ← Day label / Today badge →
+  const navRow=el('div',{class:'today-header',style:{alignItems:'center'}});
+  const prevBtn=el('button',{class:'nav-btn',style:{fontSize:'18px',width:'36px',height:'36px',flexShrink:'0'}}, '‹');
+  prevBtn.addEventListener('click',()=>{
+    if(tIdx>0){ state.viewDayIdx=tIdx-1; render(); }
+    else {
+      // go to previous week, day 6
+      const prevWeekDate=new Date(getWeekDates(state.weekKey)[0]);
+      prevWeekDate.setDate(prevWeekDate.getDate()-7);
+      state.weekKey=getWeekKey(prevWeekDate);
+      state.ticks=loadTicks(state.weekKey);
+      state.viewDayIdx=6;
+      render();
+    }
+  });
+  const nextBtn=el('button',{class:'nav-btn',style:{fontSize:'18px',width:'36px',height:'36px',flexShrink:'0'}}, '›');
+  const isAtFutureBound=(tIdx>=6 && state.weekKey===getWeekKey(new Date()) && tIdx>=realTodayIdx);
+  nextBtn.disabled=isAtFutureBound;
+  nextBtn.style.opacity=isAtFutureBound?'0.25':'1';
+  nextBtn.addEventListener('click',()=>{
+    if(isAtFutureBound) return;
+    if(tIdx<6){ state.viewDayIdx=tIdx+1; render(); }
+    else {
+      // go to next week, day 0 — but only if not in current week beyond today
+      const nextWeekDate=new Date(getWeekDates(state.weekKey)[0]);
+      nextWeekDate.setDate(nextWeekDate.getDate()+7);
+      const nwk=getWeekKey(nextWeekDate);
+      if(nwk<=getWeekKey(new Date())){
+        state.weekKey=nwk;
+        state.ticks=loadTicks(state.weekKey);
+        state.viewDayIdx=0;
+        render();
+      }
+    }
+  });
+
+  const dayLabel=el('div',{style:{flex:'1',textAlign:'center'}});
+  const dateStr=DAYS_FULL[tIdx]+', '+fmtDate(weekDates[tIdx]);
+  dayLabel.appendChild(el('div',{class:'today-date'},dateStr));
+  const badge=isViewingToday
+    ? el('div',{class:'today-label'},'Today')
+    : (()=>{
+        const b=el('button',{class:'today-label',style:{background:'rgba(245,166,35,.1)',border:'1px solid rgba(245,166,35,.3)',borderRadius:'8px',padding:'2px 8px',cursor:'pointer',color:'#f5a623',fontSize:'11px'}}, 'Jump to Today');
+        b.addEventListener('click',()=>{ state.viewDayIdx=realTodayIdx; state.weekKey=getWeekKey(new Date()); state.ticks=loadTicks(state.weekKey); render(); });
+        return b;
+      })();
+  dayLabel.appendChild(badge);
+
+  navRow.appendChild(prevBtn);
+  navRow.appendChild(dayLabel);
+  navRow.appendChild(nextBtn);
+  navRow.appendChild(sealWrap);
+  wrap.appendChild(navRow);
+  GOALS.forEach(goal=>{
+    const isWR=goal.multiMode;
+    const rawVal=isWR?(state.ticks[`walk_run:${tIdx}`]??null):(state.ticks[`${goal.id}:${tIdx}`]??null);
+    const wrMeta=(isWR&&rawVal&&rawVal!=='x'&&rawVal!=='na')?WR_META[rawVal]:null;
+    const isDoneVal=isWR?(!!rawVal&&rawVal!=='x'&&rawVal!=='na'):(rawVal===true);
+    const isMissed=rawVal==='x', isNA=rawVal==='na';
+    let borderColor='#1a2535';
+    if(isDoneVal) borderColor=wrMeta?wrMeta.color:'#f5a623';
+    else if(isMissed) borderColor='rgba(255,80,80,.35)';
+    else if(isNA) borderColor='#2d3f55';
+    const card=el('div',{class:'goal-card'+(isDoneVal?' done':''),style:{borderColor}});
+    let stTxt='Not logged',stColor='#4a5568';
+    if(isWR&&wrMeta){stTxt=wrMeta.label;stColor=wrMeta.color;}
+    else if(rawVal==='x'){stTxt='Missed ✕';stColor='#ff5050';}
+    else if(rawVal==='na'){stTxt='N/A — planned skip';stColor='#4a5568';}
+    else if(isWR){stTxt='Hold to log';}
+    else if(isDoneVal){stTxt='Done ✓';stColor='#f5a623';}
+    card.appendChild(el('span',{class:'goal-icon'},goal.icon));
+    card.appendChild(el('div',{class:'goal-info'},[
+      el('div',{class:'goal-name'},goal.label),
+      el('div',{class:'goal-status',style:{color:stColor}},stTxt),
+    ]));
+    if(isWR){
+      const btn=el('button',{class:'wr-btn'});
+      if(wrMeta){btn.style.borderColor=wrMeta.color;btn.style.background=wrMeta.bg;btn.style.color=wrMeta.color;btn.textContent=wrMeta.short;}
+      else if(isMissed){btn.style.borderColor='#ff5050';btn.style.background='rgba(255,80,80,.15)';btn.style.color='#ff5050';btn.textContent='✕';}
+      else if(isNA){btn.style.borderColor='#2d3f55';btn.style.color='#4a5568';btn.textContent='N/A';}
+      else{btn.textContent='Log';}
+      attachTickHandlers(btn,'walk_run',tIdx,true);
+      card.appendChild(btn);
+    } else {
+      let btnCls='tick-btn'+(isDoneVal?' done':isMissed?' missed':isNA?' skipped':'');
+      const btn=el('button',{class:btnCls});
+      btn.textContent=isDoneVal?'✓':isMissed?'✕':isNA?'—':'';
+      attachTickHandlers(btn,goal.id,tIdx,false);
+      card.appendChild(btn);
+    }
+    wrap.appendChild(card);
+  });
+  wrap.appendChild(makeLegend());
+  return wrap;
+}
+
+// ── RENDER: GOALS MATRIX ──────────────────────────────────────────────────────
+function renderGoalsMatrix(){
+  const tIdx=todayDayIdx();
+  const isCurrentWeek=state.weekKey===getWeekKey(new Date());
+  const weekDates=getWeekDates(state.weekKey);
+  const wrap=el('div',{class:'matrix-wrap'});
+  const hdr=el('div',{class:'matrix-header'});
+  hdr.appendChild(el('div'));
+  weekDates.forEach((d,i)=>{
+    const isT=isCurrentWeek&&i===tIdx;
+    const col=el('div',{class:'day-col-header'+(isT?' today':'')});
+    col.appendChild(el('div',{class:'dname'},DAYS_FULL[i].slice(0,1)));
+    col.appendChild(el('div',{class:'ddate'},d.getDate()+'/'+(d.getMonth()+1)));
+    hdr.appendChild(col);
+  });
+  wrap.appendChild(hdr);
+  GOALS.forEach(goal=>{
+    const {count,naCount,pct}=goalProgress(state.ticks,goal.id,goal.target);
+    const effT=Math.max(1,goal.target-naCount),met=count>=effT;
+    const row=el('div',{class:'matrix-row'});
+    const cells=el('div',{class:'matrix-cells'});
+    cells.appendChild(el('div',{class:'goal-label-cell'},[
+      el('span',{class:'gicon'},goal.icon),
+      el('div',{},[
+        el('div',{class:'gname'},goal.label),
+        el('div',{class:'gprog'+(met?' met':'')},count+'/'+effT+(naCount?` (${naCount}N/A)`:'')),
+      ]),
+    ]));
+    for(let di=0;di<7;di++){
+      const isT=isCurrentWeek&&di===tIdx;
+      const isWR=goal.multiMode;
+      const rawVal=isWR?(state.ticks[`walk_run:${di}`]??null):(state.ticks[`${goal.id}:${di}`]??null);
+      const wrMeta=(isWR&&rawVal&&rawVal!=='x'&&rawVal!=='na')?WR_META[rawVal]:null;
+      const isDoneVal=isWR?(!!rawVal&&rawVal!=='x'&&rawVal!=='na'):(rawVal===true);
+      const isMissed=rawVal==='x', isNA=rawVal==='na';
+      let btnCls='cell-btn'+(isWR?' wr':'');
+      if(isDoneVal) btnCls+=' checked';
+      else if(isMissed) btnCls+=' missed';
+      else if(isNA) btnCls+=' skipped';
+      else if(isT) btnCls+=' today-col';
+      const btn=el('button',{class:btnCls});
+      if(isWR){
+        if(wrMeta){btn.style.borderColor=wrMeta.color;btn.style.background=wrMeta.bg;btn.style.color=wrMeta.color;btn.textContent=wrMeta.short;}
+        else if(isMissed){btn.style.borderColor='#ff5050';btn.style.background='rgba(255,80,80,.13)';btn.style.color='#ff5050';btn.textContent='✕';}
+        else if(isNA){btn.style.color='#4a5568';btn.textContent='—';}
+        else if(isT){btn.style.borderColor='#253650';btn.style.background='rgba(255,255,255,0.04)';}
+      } else {
+        btn.textContent=isDoneVal?'✓':isMissed?'✕':isNA?'—':'';
+      }
+      attachTickHandlers(btn,goal.id,di,isWR);
+      cells.appendChild(el('div',{class:'cell-wrap'},btn));
+    }
+    row.appendChild(cells);
+    const pw=el('div',{class:'prog-bar-wrap'});
+    const bg=el('div',{class:'prog-bar-bg'});
+    const fill=el('div',{class:'prog-bar-fill'});
+    fill.style.width=pct+'%';fill.style.background=met?'linear-gradient(90deg,#f5a623,#e8c06a)':'linear-gradient(90deg,#2d6fa4,#5ba3d9)';
+    bg.appendChild(fill);pw.appendChild(bg);row.appendChild(pw);
+    wrap.appendChild(row);
+  });
+  wrap.appendChild(makeLegend());
+  return wrap;
+}
+
+// ── RENDER: GOALS SUMMARY ─────────────────────────────────────────────────────
+function renderGoalsSummary(){
+  const ws=weekScore(state.ticks);
+  const weekDates=getWeekDates(state.weekKey);
+  const grade=ws>=100?"S":ws>=85?"A":ws>=70?"B":ws>=50?"C":"D";
+  const msgs={S:"Perfect week. 🔥",A:"Excellent. Keep it up.",B:"Solid effort. Push harder.",C:"Room to grow. Stay consistent.",D:"Restart. Every day is new."};
+  const wrap=el('div',{class:'summary-wrap'});
+  const sc=el('div',{class:'score-card'});
+  sc.appendChild(makeSeal(ws,90));
+  sc.appendChild(el('div',{class:'score-card-text'},[
+    el('div',{class:'sc-label'},'Week Score'),
+    el('div',{class:'sc-pct'},Math.round(ws)+'%'),
+    el('div',{class:'sc-msg'},msgs[grade]),
+    el('div',{class:'sc-range'},fmtDate(weekDates[0])+' – '+fmtDate(weekDates[6])),
+  ]));
+  wrap.appendChild(sc);
+  GOALS.forEach(goal=>{
+    const {count,pct}=goalProgress(state.ticks,goal.id,goal.target);
+    const div=el('div',{class:'sum-goal'+(met?' met':'')});
+    const effTarget=Math.max(1,goal.target-naCount);
+    const met=count>=effTarget;
+    const badge=el('span',{class:'sum-badge'+(met?' met':'')},count+'/'+effTarget+(met?' ✓':''));
+    div.appendChild(el('div',{class:'sum-goal-row'},[
+      el('div',{class:'sum-goal-left'},[el('span',{},goal.icon),goal.label]),badge,
+    ]));
+    const bg=el('div',{class:'prog-bar-bg',style:{height:'5px',borderRadius:'5px',background:'#1a2535',overflow:'hidden'}});
+    const fill=el('div',{class:'prog-bar-fill'});
+    fill.style.height='100%';fill.style.borderRadius='5px';fill.style.width=pct+'%';
+    fill.style.background=met?'linear-gradient(90deg,#f5a623,#e8c06a)':'linear-gradient(90deg,#2d6fa4,#5ba3d9)';
+    bg.appendChild(fill);div.appendChild(bg);
+    const naNote=naCount>0?` · ${naCount} N/A`:''; div.appendChild(el('div',{class:'sum-pct'},Math.round(pct)+'% of weekly target'+naNote));
+    wrap.appendChild(div);
+  });
+  return wrap;
+}
+
+// ── RENDER: TODO ──────────────────────────────────────────────────────────────
+function renderTodo(){
+  const todo=loadTodo();
+  const dk=state.todoDate;
+  const filter=state.todoFilter||'all';
+  const dayData=todo.days[dk]||{done:{},oneoff:[]};
+  const wrap=el('div',{class:'todo-wrap'});
+
+  // ── Date strip (7 days centred on selected) ──
+  const strip=el('div',{class:'date-strip'});
+  // show 7 days: 3 before selected, selected, 3 after
+  const selD=parseDateKey(dk);
+  for(let i=-3;i<=3;i++){
+    const d=new Date(selD);d.setDate(selD.getDate()+i);
+    const dkey=dateKey(d);
+    const dayIdx=d.getDay()===0?6:d.getDay()-1;
+    // check if this date has any items
+    const dayD=todo.days[dkey]||{done:{},oneoff:[]};
+    const hasItems=todo.recurring.length>0||dayD.oneoff.length>0;
+    const pill=el('button',{class:'date-pill'+(dkey===dk?' active':'')+(hasItems?' has-items':'')});
+    pill.appendChild(el('div',{class:'dp-day'},DAYS_FULL[dayIdx].slice(0,2)));
+    pill.appendChild(el('div',{class:'dp-num'},d.getDate()+''));
+    pill.addEventListener('click',()=>{ state.todoDate=dkey; render(); });
+    strip.appendChild(pill);
+  }
+  wrap.appendChild(strip);
+
+  // ── Add task ──
+  const addRow=el('div',{class:'add-task-row'});
+  const input=el('input',{class:'add-task-input',type:'text',placeholder:'Add a task…'});
+  input.value=state.addText||'';
+  input.addEventListener('input',e=>{ state.addText=e.target.value; });
+  input.addEventListener('keydown',e=>{ if(e.key==='Enter') addTask(todo); });
+  const addBtn=el('button',{class:'add-task-btn'},'+');
+  addBtn.addEventListener('click',()=>addTask(todo));
+  addRow.appendChild(input);addRow.appendChild(addBtn);
+  wrap.appendChild(addRow);
+
+  // type toggle
+  const typeToggle=el('div',{class:'add-type-toggle'});
+  const recBtn=el('button',{class:'type-btn'+(state.addType==='recurring'?' active':'')},'🔁 Recurring (every day)');
+  const oneBtn=el('button',{class:'type-btn oneoff'+(state.addType==='oneoff'?' active':'')},'📌 One-off (this day only)');
+  recBtn.addEventListener('click',()=>{ state.addType='recurring'; render(); });
+  oneBtn.addEventListener('click',()=>{ state.addType='oneoff'; render(); });
+  typeToggle.appendChild(recBtn);typeToggle.appendChild(oneBtn);
+  wrap.appendChild(typeToggle);
+
+  // ── Recurring tasks ──
+  if(todo.recurring.length>0 && (filter==='all'||filter==='pending'||filter==='done')){
+    const filtered=todo.recurring.filter(t=>{
+      const done=!!(dayData.done&&dayData.done[t.id]);
+      if(filter==='pending') return !done;
+      if(filter==='done') return done;
+      return true;
+    });
+    if(filtered.length>0){
+      const doneCount=todo.recurring.filter(t=>!!(dayData.done&&dayData.done[t.id])).length;
+      const sec=el('div',{class:'tasks-section'});
+      sec.appendChild(el('div',{class:'tasks-section-header'},[
+        el('div',{class:'tasks-section-title'},'🔁 Recurring'),
+        el('div',{class:'tasks-count'},doneCount+'/'+todo.recurring.length+' done'),
+      ]));
+      filtered.forEach(task=>{
+        const done=!!(dayData.done&&dayData.done[task.id]);
+        const item=el('div',{class:'task-item'+(done?' done-task':'')});
+        const chk=el('button',{class:'task-check'+(done?' recurring-done':'')});
+        chk.textContent=done?'✓':'';
+        chk.addEventListener('click',()=>{ toggleRecurring(todo,task.id,dk,done); });
+        item.appendChild(chk);
+        item.appendChild(el('div',{class:'task-text-wrap'},[
+          el('div',{class:'task-text'},task.text),
+          el('span',{class:'task-badge recurring'},'Recurring'),
+        ]));
+        const del=el('button',{class:'task-del'},'×');
+        del.addEventListener('click',()=>{ deleteRecurring(todo,task.id); });
+        item.appendChild(del);
+        sec.appendChild(item);
+      });
+      wrap.appendChild(sec);
+    }
+  }
+
+  // ── One-off tasks ──
+  if(filter==='all'||filter==='pending'||filter==='done'){
+    const oneoffs=(dayData.oneoff||[]).filter(t=>{
+      if(filter==='pending') return !t.done;
+      if(filter==='done') return t.done;
+      return true;
+    });
+    if(oneoffs.length>0){
+      const doneCount=(dayData.oneoff||[]).filter(t=>t.done).length;
+      const sec=el('div',{class:'tasks-section'});
+      sec.appendChild(el('div',{class:'tasks-section-header'},[
+        el('div',{class:'tasks-section-title'},'📌 One-off'),
+        el('div',{class:'tasks-count'},doneCount+'/'+(dayData.oneoff||[]).length+' done'),
+      ]));
+      oneoffs.forEach(task=>{
+        const item=el('div',{class:'task-item'+(task.done?' done-task':'')});
+        const chk=el('button',{class:'task-check'+(task.done?' checked':'')});
+        chk.textContent=task.done?'✓':'';
+        chk.addEventListener('click',()=>{ toggleOneoff(todo,dk,task.id,task.done); });
+        item.appendChild(chk);
+        item.appendChild(el('div',{class:'task-text-wrap'},[
+          el('div',{class:'task-text'},task.text),
+          el('span',{class:'task-badge oneoff'},fmtDate(parseDateKey(dk))+' only'),
+        ]));
+        const del=el('button',{class:'task-del'},'×');
+        del.addEventListener('click',()=>{ deleteOneoff(todo,dk,task.id); });
+        item.appendChild(del);
+        sec.appendChild(item);
+      });
+      wrap.appendChild(sec);
+    }
+  }
+
+  // Empty state
+  const totalVisible=
+    (todo.recurring.filter(t=>{ const done=!!(dayData.done&&dayData.done[t.id]); return filter==='all'||(filter==='pending'&&!done)||(filter==='done'&&done); }).length)+
+    ((dayData.oneoff||[]).filter(t=>filter==='all'||(filter==='pending'&&!t.done)||(filter==='done'&&t.done)).length);
+  if(totalVisible===0){
+    const msgs={all:'No tasks for this day.\nAdd one above!',pending:'All done! 🎉',done:'Nothing completed yet.'};
+    const es=el('div',{class:'empty-state'});
+    es.appendChild(el('div',{class:'ei'},filter==='done'?'✅':filter==='pending'?'⏳':'📋'));
+    es.appendChild(document.createTextNode(msgs[filter]));
+    wrap.appendChild(es);
+  }
+
+  return wrap;
+}
+
+// ── TODO ACTIONS ──────────────────────────────────────────────────────────────
+function addTask(todo){
+  const text=(state.addText||'').trim();
+  if(!text)return;
+  if(state.addType==='recurring'){
+    todo.recurring.push({id:genId(),text});
+  } else {
+    if(!todo.days[state.todoDate])todo.days[state.todoDate]={done:{},oneoff:[]};
+    if(!todo.days[state.todoDate].oneoff)todo.days[state.todoDate].oneoff=[];
+    todo.days[state.todoDate].oneoff.push({id:genId(),text,done:false});
+  }
+  saveTodo(todo);
+  state.addText='';
+  render();
+}
+function toggleRecurring(todo,taskId,dk,wasDone){
+  if(!todo.days[dk])todo.days[dk]={done:{},oneoff:[]};
+  if(!todo.days[dk].done)todo.days[dk].done={};
+  todo.days[dk].done[taskId]=!wasDone;
+  saveTodo(todo);render();
+}
+function toggleOneoff(todo,dk,taskId,wasDone){
+  const t=(todo.days[dk].oneoff||[]).find(x=>x.id===taskId);
+  if(t)t.done=!wasDone;
+  saveTodo(todo);render();
+}
+function deleteRecurring(todo,taskId){
+  todo.recurring=todo.recurring.filter(t=>t.id!==taskId);
+  saveTodo(todo);render();
+}
+function deleteOneoff(todo,dk,taskId){
+  if(todo.days[dk]&&todo.days[dk].oneoff)
+    todo.days[dk].oneoff=todo.days[dk].oneoff.filter(t=>t.id!==taskId);
+  saveTodo(todo);render();
+}
+
+
+// ── EMOJI PICKER DATA ─────────────────────────────────────────────────────────
+// Emoji list: [emoji, "search keywords"]
+const EMOJI_LIST = [
+  // Wellness & spiritual
+  ['\U0001f549\ufe0f','om meditation spiritual prayer yoga'],
+  ['\U0001f9d8','yoga meditation mindfulness zen relax'],
+  ['\U0001f32c\ufe0f','wind breath breathing air'],
+  ['\U0001f4ab','sparkle magic star'],
+  ['\U00002728','sparkles magic shine'],
+  ['\U0001f31f','star glow shine bright'],
+  ['\U0001f31e','sun sunrise morning energy'],
+  ['\U0001f319','moon night sleep rest'],
+  ['\U0001f54a\ufe0f','peace dove calm spirit'],
+  ['\U0001f3b5','music song listen audio'],
+  ['\U0001f9e0','brain mind think mental'],
+  ['\U0001f497','heart love care'],
+  ['\U0001f4a7','drop water hydration drink'],
+  ['\U0001f30a','wave water ocean swim'],
+  ['\U0001f33f','herb plant nature green'],
+  ['\U0001f343','leaf nature green'],
+  // Fitness
+  ['\U0001f4aa','muscle workout flex strength gym'],
+  ['\U0001f3c3','run running jog exercise walk'],
+  ['\U0001f6b4','cycle bike cycling cardio'],
+  ['\U0001f3cb\ufe0f','lift weights gym strength training'],
+  ['\U0001f93c','wrestle sport fight martial arts'],
+  ['\U0001f3ca','swim swimming pool water'],
+  ['\U000026f9\ufe0f','basketball sport ball'],
+  ['\U0001f94b','karate martial arts kick'],
+  ['\U0001f6b5','mountain bike cycle outdoor'],
+  ['\U0001f9d7','climb wall sport exercise'],
+  ['\U0001f93a','fencing sword sport'],
+  ['\U0001f945','goal sport target net'],
+  ['\U0001f3af','target aim focus goal dart'],
+  ['\U0001fa83','boomerang throw sport'],
+  ['\U0001f3c4','surf water board sport'],
+  ['\U0001f6f9','skateboard skate sport'],
+  // Learning
+  ['\U0001f4d6','book read study learn open'],
+  ['\U0001f4da','books library study stack'],
+  ['\U0001f4dd','memo write note journal'],
+  ['\U0001f4bb','laptop computer code work'],
+  ['\U0001f393','graduation study learn school'],
+  ['\U0001f4bc','briefcase work job career'],
+  ['\U0001f9ea','science test experiment lab'],
+  ['\U0001f52c','research microscope study'],
+  ['\U0001f4ca','chart stats data analysis'],
+  ['\U0001f4c8','growth chart up progress'],
+  ['\U0001f4c9','chart decline data'],
+  ['\U0001f4c5','calendar date schedule'],
+  ['\U0001f4c6','calendar plan schedule'],
+  ['\U0001f4cb','clipboard list task'],
+  ['\U00002712\ufe0f','pen write edit'],
+  ['\U0001f4af','100 perfect score'],
+  // Food & health
+  ['\U0001f34e','apple fruit healthy food diet'],
+  ['\U0001f966','broccoli vegetable healthy food'],
+  ['\U0001f951','avocado healthy food fat'],
+  ['\U0001f353','strawberry fruit food'],
+  ['\U0001f95e','pancake food breakfast'],
+  ['\U0001f363','sushi fish food'],
+  ['\U0001f373','cooking food meal cook'],
+  ['\U0001f9c2','salt food seasoning'],
+  ['\U0001f376','sake drink tea'],
+  ['\U0001f375','tea drink hot warm'],
+  ['\U0001f964','juice drink beverage'],
+  ['\U0001f9c9','milk drink dairy'],
+  ['\U0001f9c8','honey food sweet'],
+  ['\U0001f48a','pill medicine health tablet'],
+  ['\U0001f3e5','hospital health medical clinic'],
+  ['\U0001fa7a','stethoscope doctor health'],
+  // Productivity
+  ['\U000023f0','alarm clock time schedule wake'],
+  ['\U000023f3','hourglass time wait countdown'],
+  ['\U0001f4e7','email message inbox work'],
+  ['\U0001f4e8','inbox email receive'],
+  ['\U0001f4e5','inbox tray receive'],
+  ['\U0001f5d3\ufe0f','calendar spiral plan schedule'],
+  ['\U000026a1','lightning fast energy bolt'],
+  ['\U0001f525','fire hot streak motivation'],
+  ['\U0001f4a1','idea bulb light think'],
+  ['\U0001f511','key unlock access'],
+  ['\U0001f512','lock secure private'],
+  ['\U0001f6aa','door entry home'],
+  ['\U0001f3e0','house home family'],
+  ['\U0001f6e0\ufe0f','tools fix build work'],
+  ['\U00002699\ufe0f','gear settings manage'],
+  // Nature
+  ['\U0001f33b','sunflower flower nature'],
+  ['\U0001f332','tree nature green evergreen'],
+  ['\U0001f333','tree nature park'],
+  ['\U0001f33c','flower blossom spring'],
+  ['\U0001f340','clover leaf lucky nature'],
+  ['\U0001f30d','earth world globe nature'],
+  ['\U000026f0\ufe0f','mountain hike outdoor nature'],
+  ['\U0001f3d5\ufe0f','camping tent outdoor nature'],
+  ['\U0001f30c','galaxy milky way night sky'],
+  ['\U00002600\ufe0f','sun sunny bright day'],
+  ['\U0001f308','rainbow color weather'],
+  ['\U000026c5','cloud partly sunny weather'],
+  ['\U0001f327\ufe0f','rain cloud weather'],
+  ['\U000026a1\ufe0f','lightning storm thunder'],
+  ['\U00002744\ufe0f','snow cold winter freeze'],
+  ['\U0001f30b','volcano mountain erupt'],
+  // People & awards
+  ['\U0001f9b8','hero super person'],
+  ['\U0001f46a','family people together'],
+  ['\U0001f91d','handshake deal partner'],
+  ['\U0001f44f','clap applause cheer'],
+  ['\U0001f64c','raise hands celebrate'],
+  ['\U0001f64f','pray hands namaste gratitude'],
+  ['\U0001f3c6','trophy win award champion'],
+  ['\U0001f947','gold medal first win'],
+  ['\U0001f948','silver medal second'],
+  ['\U0001f949','bronze medal third'],
+  ['\U0001f3c5','medal award achievement'],
+  ['\U0001f451','crown king queen leader'],
+  ['\U0001f4b0','money wealth finance save'],
+  ['\U0001f30e','globe world travel'],
+  ['\U0001f9f8','teddy toy fun relax'],
+  ['\U0001f3b8','guitar music play'],
+];
+
+// ── MANAGE HABITS MODAL ───────────────────────────────────────────────────────
+let _emojiCb = null; // callback when emoji picked
+let _epSearch = '';
+let _dragSrc = null;
+
+function openEmojiPicker(cb){
+  _emojiCb = cb;
+  _epSearch = '';
+  renderEmojiPicker();
+}
+
+function renderEmojiPicker(){
+  const mr = document.getElementById('modal-root');
+  // Remove existing emoji overlay if any
+  const existing = document.getElementById('ep-overlay');
+  if(existing) existing.remove();
+
+  const overlay = el('div',{class:'ep-overlay',id:'ep-overlay'});
+  const box = el('div',{class:'ep-box'});
+  const search = el('input',{class:'ep-search', type:'text', placeholder:'Search emoji\u2026'});
+  search.value = _epSearch;
+  search.addEventListener('input', e => { _epSearch = e.target.value; renderEmojiGrid(grid, _epSearch); });
+  box.appendChild(search);
+  const grid = el('div',{class:'ep-grid'});
+  renderEmojiGrid(grid, _epSearch);
+  box.appendChild(grid);
+  overlay.appendChild(box);
+  overlay.addEventListener('click', e => { if(e.target===overlay){ overlay.remove(); _emojiCb=null; } });
+  mr.appendChild(overlay);
+  setTimeout(()=>search.focus(),100);
+}
+
+function renderEmojiGrid(grid, q){
+  grid.innerHTML = '';
+  const qLow = q ? q.toLowerCase() : '';
+  const list = qLow
+    ? EMOJI_LIST.filter(([emoji, tags]) => tags.includes(qLow) || emoji.includes(qLow))
+    : EMOJI_LIST;
+  list.forEach(([emoji]) => {
+    const btn = el('button',{class:'ep-btn'}, emoji);
+    btn.addEventListener('click',()=>{
+      if(_emojiCb){ _emojiCb(emoji); _emojiCb=null; }
+      document.getElementById('ep-overlay')?.remove();
+      renderManageHabits();
+    });
+    grid.appendChild(btn);
+  });
+}
+
+function renderManageHabits(){
+  const mr = document.getElementById('modal-root');
+  // Remove old manage modal but keep emoji picker if open
+  const existing = document.getElementById('mh-overlay');
+  if(existing) existing.remove();
+  if(!state.manageHabitsOpen) return;
+
+  const overlay = el('div',{class:'modal-overlay',id:'mh-overlay'});
+  const box = el('div',{class:'modal-box mh-modal-box'});
+  box.appendChild(el('div',{class:'modal-title'},'\u2699\ufe0f Manage Habits'));
+
+  // Edit icon for new goal in progress
+  if(!state.mhNewIcon) state.mhNewIcon = '\u2b50';
+
+  // List of current habits
+  box.appendChild(el('div',{class:'mh-section-title'},'Your Habits'));
+
+  GOALS.forEach((goal, idx) => {
+    const item = el('div',{class:'mh-item', 'data-idx':idx});
+
+    // Drag handle
+    const drag = el('div',{class:'mh-drag'}, '\u22ee\u22ee');
+    drag.addEventListener('touchstart', e => startDrag(e, idx), {passive:true});
+    drag.addEventListener('mousedown', e => startDrag(e, idx));
+    item.appendChild(drag);
+
+    // Icon button
+    const iconBtn = el('button',{class:'mh-icon-btn'}, goal.icon);
+    iconBtn.addEventListener('click',()=>{
+      openEmojiPicker(newEmoji => {
+        GOALS[idx].icon = newEmoji;
+        saveGoals(GOALS);
+        render();
+      });
+    });
+    item.appendChild(iconBtn);
+
+    // Name (editable inline)
+    const nameInput = el('input',{class:'mh-add-input mh-label', type:'text', value:goal.label, style:{flex:'1',minWidth:'0',height:'36px',padding:'0 10px'}});
+    nameInput.addEventListener('change', e => {
+      GOALS[idx].label = e.target.value.trim() || goal.label;
+      saveGoals(GOALS);
+    });
+    item.appendChild(nameInput);
+
+    // Target number
+    const targetInput = el('input',{class:'mh-target', type:'number', value:goal.target, min:'1', max:'7'});
+    targetInput.addEventListener('change', e => {
+      const v = Math.min(7, Math.max(1, parseInt(e.target.value)||goal.target));
+      GOALS[idx].target = v;
+      saveGoals(GOALS);
+    });
+    item.appendChild(targetInput);
+
+    // Delete
+    const delBtn = el('button',{class:'mh-del'}, '\u00d7');
+    delBtn.addEventListener('click',()=>{
+      if(GOALS.length <= 1){ alert('Need at least 1 habit!'); return; }
+      GOALS.splice(idx, 1);
+      saveGoals(GOALS);
+      render();
+      renderManageHabits();
+    });
+    item.appendChild(delBtn);
+    box.appendChild(item);
+  });
+
+  // Add new habit row
+  box.appendChild(el('div',{class:'mh-section-title'},'Add New Habit'));
+  const addRow = el('div',{class:'mh-add-row'});
+
+  const iconPickBtn = el('button',{class:'mh-add-icon', id:'mh-new-icon-btn'}, state.mhNewIcon||'\u2b50');
+  iconPickBtn.addEventListener('click',()=>{
+    openEmojiPicker(e => { state.mhNewIcon=e; renderManageHabits(); });
+  });
+  addRow.appendChild(iconPickBtn);
+
+  const nameIn = el('input',{class:'mh-add-input', type:'text', placeholder:'Habit name\u2026', id:'mh-new-name'});
+  nameIn.value = state.mhNewName||'';
+  nameIn.addEventListener('input', e => state.mhNewName = e.target.value);
+  addRow.appendChild(nameIn);
+
+  const addBtn = el('button',{class:'mh-add-btn'}, '+');
+  addBtn.addEventListener('click',()=>{
+    const name = (state.mhNewName||'').trim();
+    if(!name) return;
+    const id = 'habit_'+Date.now();
+    GOALS.push({id, label:name, target:5, icon:state.mhNewIcon||'\u2b50'});
+    saveGoals(GOALS);
+    state.mhNewName=''; state.mhNewIcon='\u2b50';
+    render();
+    renderManageHabits();
+  });
+  addRow.appendChild(addBtn);
+  box.appendChild(addRow);
+
+  const closeBtn = el('button',{class:'modal-close',style:{marginTop:'16px'}},'Done');
+  closeBtn.addEventListener('click',()=>{ state.manageHabitsOpen=false; render(); });
+  box.appendChild(closeBtn);
+
+  overlay.appendChild(box);
+  overlay.addEventListener('click', e => { if(e.target===overlay){ state.manageHabitsOpen=false; render(); } });
+  mr.appendChild(overlay);
+}
+
+// Drag-to-reorder for habits
+let _dragIdx = null;
+function startDrag(e, idx){
+  _dragIdx = idx;
+  const items = document.querySelectorAll('#mh-overlay .mh-item');
+  items[idx]?.classList.add('dragging');
+  document.addEventListener('touchmove', onDragMove, {passive:false});
+  document.addEventListener('touchend', endDrag);
+  document.addEventListener('mousemove', onDragMove);
+  document.addEventListener('mouseup', endDrag);
+}
+function onDragMove(e){
+  e.preventDefault();
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  const items = document.querySelectorAll('#mh-overlay .mh-item');
+  items.forEach(item => item.classList.remove('drag-over'));
+  for(let i=0;i<items.length;i++){
+    const rect = items[i].getBoundingClientRect();
+    if(clientY >= rect.top && clientY <= rect.bottom && i !== _dragIdx){
+      items[i].classList.add('drag-over');
+      break;
+    }
+  }
+}
+function endDrag(e){
+  document.removeEventListener('touchmove', onDragMove);
+  document.removeEventListener('touchend', endDrag);
+  document.removeEventListener('mousemove', onDragMove);
+  document.removeEventListener('mouseup', endDrag);
+  const items = document.querySelectorAll('#mh-overlay .mh-item');
+  let targetIdx = null;
+  items.forEach((item,i) => { if(item.classList.contains('drag-over')) targetIdx=i; });
+  items.forEach(item => { item.classList.remove('dragging','drag-over'); });
+  if(targetIdx !== null && targetIdx !== _dragIdx){
+    const moved = GOALS.splice(_dragIdx,1)[0];
+    GOALS.splice(targetIdx,0,moved);
+    saveGoals(GOALS);
+    render();
+    renderManageHabits();
+  }
+  _dragIdx = null;
+}
+
+// ── RENDER: CALENDAR MODAL ────────────────────────────────────────────────────
+function renderCalModal(){
+  const mr=document.getElementById('modal-root');mr.innerHTML='';
+  if(!state.calOpen)return;
+  const todo=loadTodo();
+  const overlay=el('div',{class:'modal-overlay'});
+  const box=el('div',{class:'modal-box'});
+  box.appendChild(el('div',{class:'modal-title'},'Pick a Date'));
+
+  // Month nav
+  const mnav=el('div',{class:'cal-month-nav'});
+  const prevM=el('button',{class:'cmnav-btn'},'‹');
+  prevM.addEventListener('click',()=>{
+    state.calMonth--;if(state.calMonth<0){state.calMonth=11;state.calYear--;}render();
+  });
+  const nextM=el('button',{class:'cmnav-btn'},'›');
+  nextM.addEventListener('click',()=>{
+    state.calMonth++;if(state.calMonth>11){state.calMonth=0;state.calYear++;}render();
+  });
+  const monthLabel=new Date(state.calYear,state.calMonth,1).toLocaleString("default",{month:"long"})+' '+state.calYear;
+  mnav.appendChild(prevM);
+  mnav.appendChild(el('div',{class:'cmnav-label'},monthLabel));
+  mnav.appendChild(nextM);
+  box.appendChild(mnav);
+
+  // Day headers
+  const ghdr=el('div',{class:'cal-grid-header'});
+  ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(d=>ghdr.appendChild(el('div',{},d)));
+  box.appendChild(ghdr);
+
+  // Grid
+  const grid=el('div',{class:'cal-grid'});
+  const firstDay=new Date(state.calYear,state.calMonth,1).getDay();
+  const daysInMonth=new Date(state.calYear,state.calMonth+1,0).getDate();
+  const todayStr=dateKey(new Date());
+  for(let i=0;i<firstDay;i++) grid.appendChild(el('div',{}));
+  for(let d=1;d<=daysInMonth;d++){
+    const dk2=state.calYear+'-'+pad(state.calMonth+1)+'-'+pad(d);
+    const isT=dk2===todayStr, isSel=dk2===state.todoDate;
+    const dayData=todo.days[dk2]||{done:{},oneoff:[]};
+    const hasItems=todo.recurring.length>0||(dayData.oneoff&&dayData.oneoff.length>0);
+    const btn=el('button',{class:'cal-day-btn'+(isT?' today':'')+(isSel?' selected':'')+(hasItems&&!isSel?' has-items':'')},d+'');
+    btn.addEventListener('click',()=>{
+      state.todoDate=dk2;state.calOpen=false;render();
+    });
+    grid.appendChild(btn);
+  }
+  box.appendChild(grid);
+
+  const closeBtn=el('button',{class:'modal-close'},'Close');
+  closeBtn.addEventListener('click',()=>{ state.calOpen=false;render(); });
+  box.appendChild(closeBtn);
+
+  overlay.addEventListener('click',e=>{ if(e.target===overlay){state.calOpen=false;render();} });
+  overlay.appendChild(box);
+  mr.appendChild(overlay);
+}
+
+// ── WISHLIST STORAGE ─────────────────────────────────────────────────────────
+function loadWishlist(){ try{ return JSON.parse(localStorage.getItem('tapasya:wishlist'))||[]; }catch{ return []; } }
+function saveWishlist(w){ try{ localStorage.setItem('tapasya:wishlist',JSON.stringify(w)); }catch{} }
+
+const WL_CATS = ['All','Personal','Tech','Home','Travel','Health','Books','Other'];
+const WL_PRIORITIES = ['high','medium','low'];
+
+// ── RENDER: WISHLIST ──────────────────────────────────────────────────────────
+function renderWishlist(){
+  const items=loadWishlist();
+  const filter=state.wlFilter||'all';
+  const catFilter=state.wlCat||'All';
+  const wrap=el('div',{class:'wishlist-wrap'});
+
+  // Stats
+  const total=items.length, bought=items.filter(w=>w.bought).length, pending=total-bought;
+  const stats=el('div',{class:'wl-stats'});
+  [{n:total,l:'Total'},{n:pending,l:'Pending'},{n:bought,l:'Acquired'}].forEach(s=>{
+    stats.appendChild(el('div',{class:'wl-stat'},[
+      el('div',{class:'wls-num'},s.n+''),
+      el('div',{class:'wls-label'},s.l),
+    ]));
+  });
+  wrap.appendChild(stats);
+
+  // Add form toggle
+  const toggleBtn=el('button',{class:'wl-toggle-form'},state.wlFormOpen?'✕ Close':'+ Add New Item');
+  toggleBtn.addEventListener('click',()=>{ state.wlFormOpen=!state.wlFormOpen; render(); });
+  wrap.appendChild(toggleBtn);
+
+  // Add form
+  if(state.wlFormOpen){
+    const form=el('div',{class:'wl-add-form'});
+    const nameIn=el('input',{type:'text',placeholder:'Item name…'});
+    nameIn.value=state.wlNewName||'';
+    nameIn.addEventListener('input',e=>state.wlNewName=e.target.value);
+
+    const noteIn=el('textarea',{placeholder:'Note or reason (optional)…'});
+    noteIn.value=state.wlNewNote||'';
+    noteIn.addEventListener('input',e=>state.wlNewNote=e.target.value);
+
+    const row=el('div',{class:'wl-form-row'});
+    const catSel=el('select',{class:'wl-select'});
+    WL_CATS.filter(c=>c!=='All').forEach(c=>{
+      const opt=el('option',{value:c},c);
+      if((state.wlNewCat||'Personal')===c) opt.selected=true;
+      catSel.appendChild(opt);
+    });
+    catSel.addEventListener('change',e=>state.wlNewCat=e.target.value);
+
+    const priSel=el('select',{class:'wl-select'});
+    WL_PRIORITIES.forEach(p=>{
+      const opt=el('option',{value:p},p.charAt(0).toUpperCase()+p.slice(1));
+      if((state.wlNewPri||'medium')===p) opt.selected=true;
+      priSel.appendChild(opt);
+    });
+    priSel.addEventListener('change',e=>state.wlNewPri=e.target.value);
+
+    row.appendChild(catSel); row.appendChild(priSel);
+    const submit=el('button',{class:'wl-submit'},'Add to Wishlist ✨');
+    submit.addEventListener('click',()=>{
+      const name=(state.wlNewName||'').trim();
+      if(!name)return;
+      const wl=loadWishlist();
+      wl.unshift({id:genId(),name,note:state.wlNewNote||'',cat:state.wlNewCat||'Personal',priority:state.wlNewPri||'medium',bought:false,addedOn:dateKey(new Date())});
+      saveWishlist(wl);
+      state.wlNewName='';state.wlNewNote='';state.wlFormOpen=false;
+      render();
+    });
+    form.appendChild(nameIn);form.appendChild(noteIn);form.appendChild(row);form.appendChild(submit);
+    wrap.appendChild(form);
+  }
+
+  // Category filter
+  const cats=el('div',{class:'wl-categories'});
+  WL_CATS.forEach(c=>{
+    const btn=el('button',{class:'wl-cat-btn'+(catFilter===c?' active':'')},c);
+    btn.addEventListener('click',()=>{ state.wlCat=c; render(); });
+    cats.appendChild(btn);
+  });
+  wrap.appendChild(cats);
+
+  // Items
+  let filtered=items.filter(w=>{
+    const catOk=catFilter==='All'||w.cat===catFilter;
+    const filterOk=filter==='all'||(filter==='pending'&&!w.bought)||(filter==='bought'&&w.bought);
+    return catOk&&filterOk;
+  });
+
+  if(filtered.length===0){
+    const msgs={all:'Your wishlist is empty. Tap + Add New Item to start!',pending:'Nothing pending. All acquired!',bought:'Nothing acquired yet.'};
+    const es=el('div',{class:'empty-state'});
+    es.appendChild(el('div',{class:'ei'},'🌟'));
+    es.appendChild(document.createTextNode(msgs[filter]||'No items.'));
+    wrap.appendChild(es);
+  } else {
+    filtered.forEach(item=>{
+      const card=el('div',{class:'wl-item'+(item.bought?' bought':'')});
+      const chk=el('button',{class:'wl-check'+(item.bought?' checked':'')});
+      chk.textContent=item.bought?'✓':'';
+      chk.addEventListener('click',()=>{
+        const wl=loadWishlist();
+        const w=wl.find(x=>x.id===item.id);
+        if(w){ w.bought=!w.bought; if(w.bought) w.acquiredOn=dateKey(new Date()); else delete w.acquiredOn; }
+        saveWishlist(wl);render();
+      });
+      card.appendChild(chk);
+
+      const info=el('div',{class:'wl-info'});
+      info.appendChild(el('div',{class:'wl-name'},item.name));
+      const meta=el('div',{class:'wl-meta'});
+      const catTag=el('span',{class:'wl-cat-tag'},item.cat||'Personal');
+      const priTag=el('span',{class:'wl-priority '+(item.priority||'medium')},(item.priority||'medium').charAt(0).toUpperCase()+(item.priority||'medium').slice(1));
+      meta.appendChild(catTag);meta.appendChild(priTag);
+      if(item.acquiredOn) meta.appendChild(el('span',{style:{fontSize:'10px',color:'#4a5568'}},'Acquired '+fmtDate(parseDateKey(item.acquiredOn))));
+      info.appendChild(meta);
+      if(item.note) info.appendChild(el('div',{class:'wl-note'},item.note));
+      card.appendChild(info);
+
+      const del=el('button',{class:'wl-del'},'×');
+      del.addEventListener('click',()=>{
+        const wl=loadWishlist().filter(x=>x.id!==item.id);
+        saveWishlist(wl);render();
+      });
+      card.appendChild(del);
+      wrap.appendChild(card);
+    });
+  }
+  return wrap;
+}
+
+// ── LEGEND ────────────────────────────────────────────────────────────────────
+function makeLegend(){
+  const leg=el('div',{class:'legend'});
+  leg.appendChild(el('div',{class:'legend-title'},'Walk / Run · tap to cycle'));
+  const items=el('div',{class:'legend-items'});
+  Object.entries(WR_META).forEach(([k,v])=>{
+    const chip=el('span',{class:'legend-chip'},v.short+' = '+v.label);
+    chip.style.color=v.color;chip.style.background=v.bg;
+    items.appendChild(chip);
+  });
+  leg.appendChild(items);
+  return leg;
+}
+
+// ── MAIN RENDER ───────────────────────────────────────────────────────────────
+function render(){
+  renderSectionTabs();
+  renderSubHeader();
+  renderBottomNav();
+  renderCalModal();
+  renderManageHabits();
+  const content=document.getElementById('content');
+  content.innerHTML='';
+  if(state.section==='goals'){
+    if(state.goalsTab==='today') content.appendChild(renderGoalsToday());
+    else if(state.goalsTab==='week') content.appendChild(renderGoalsMatrix());
+    else content.appendChild(renderGoalsSummary());
+  } else if(state.section==='todo'){
+    content.appendChild(renderTodo());
+  } else {
+    content.appendChild(renderWishlist());
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+state.ticks=loadTicks(state.weekKey);
+state.todoFilter='all';
+render();
+
+// ── OFFLINE INDICATOR ─────────────────────────────────────────────────────────
+(function(){
+  const bar = document.createElement('div');
+  bar.id = 'offline-bar';
+  Object.assign(bar.style, {
+    position:'fixed', top:'0', left:'50%', transform:'translateX(-50%)',
+    width:'100%', maxWidth:'520px', background:'#1a2535',
+    color:'#7a8fa6', fontSize:'11px', fontWeight:'600', textAlign:'center',
+    padding:'6px 0', zIndex:'100', display:'none',
+    letterSpacing:'.05em', borderBottom:'1px solid #f5a62344'
+  });
+  bar.textContent = '📴 Offline — your data is saved locally';
+  document.getElementById('app').appendChild(bar);
+  function updateBar(){ bar.style.display = navigator.onLine ? 'none' : 'block'; }
+  window.addEventListener('online', updateBar);
+  window.addEventListener('offline', updateBar);
+  updateBar();
+})();
+
+// ── A2HS PROMPT ───────────────────────────────────────────────────────────────
+let _deferredInstall = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstall = e;
+  // Show a subtle install nudge after 3s if not already installed
+  setTimeout(() => {
+    if (!_deferredInstall) return;
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+    const nudge = document.createElement('div');
+    nudge.id = 'install-nudge';
+    Object.assign(nudge.style, {
+      position:'fixed', bottom:'72px', left:'50%', transform:'translateX(-50%)',
+      background:'#1a2f4a', border:'1.5px solid #f5a62355', borderRadius:'14px',
+      padding:'10px 14px', display:'flex', alignItems:'center', gap:'10px',
+      zIndex:'30', maxWidth:'320px', width:'calc(100% - 28px)',
+      boxShadow:'0 4px 20px rgba(0,0,0,.5)', fontSize:'12px', color:'#b0c4de'
+    });
+    nudge.innerHTML = `<span style="font-size:20px">📲</span>
+      <span style="flex:1;line-height:1.4">Install <strong style="color:#f5a623">Tapasya</strong> for offline access</span>
+      <button id="install-yes" style="padding:6px 12px;border-radius:9px;border:none;background:#f5a623;color:#0d1520;font-weight:700;font-size:11px;cursor:pointer;white-space:nowrap">Install</button>
+      <button id="install-no" style="padding:6px 8px;border-radius:9px;border:1px solid #1e2f45;background:transparent;color:#4a5568;font-size:16px;cursor:pointer;line-height:1">×</button>`;
+    document.getElementById('app').appendChild(nudge);
+    document.getElementById('install-yes').addEventListener('click', () => {
+      _deferredInstall.prompt();
+      _deferredInstall.userChoice.then(() => { _deferredInstall = null; nudge.remove(); });
+    });
+    document.getElementById('install-no').addEventListener('click', () => nudge.remove());
+  }, 3000);
+});
+</script>
+</body>
+</html>
