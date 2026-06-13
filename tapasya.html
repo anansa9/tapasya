@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>Tapasya</title>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Tapasya"/>
+<meta name="theme-color" content="#0d1520"/>
+<link rel="manifest" id="pwa-manifest"/>
+<style>
+/* Space Grotesk system fallback – matches the geometric sans feel closely */
+@import url('data:text/css,');
+</style>
+<script>
+// ── PWA MANIFEST ─────────────────────────────────────────────────────────────
+(function(){
+  const m={name:"Tapasya",short_name:"Tapasya",start_url:"./",display:"standalone",
+    background_color:"#0d1520",theme_color:"#0d1520",orientation:"portrait",
+    icons:[
+      {src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%230d1520'/><text x='96' y='130' font-size='100' text-anchor='middle'>🎯</text></svg>",sizes:"192x192",type:"image/svg+xml"},
+      {src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%230d1520'/><text x='256' y='340' font-size='280' text-anchor='middle'>🎯</text></svg>",sizes:"512x512",type:"image/svg+xml"}
+    ]};
+  document.getElementById('pwa-manifest').href=URL.createObjectURL(new Blob([JSON.stringify(m)],{type:'application/manifest+json'}));
+})();
+
+// ── OFFLINE CACHE (Cache API — works without a service worker) ────────────────
+// Strategy: cache this page on every online load. When offline, the browser
+// serves from HTTP cache (standard) — but we also explicitly store in CacheStorage
+// so it survives cache eviction. No SW needed; data stays in localStorage anyway.
+(async()=>{
+  if(!('caches' in window)) return;
+  const CACHE = 'tapasya-v3';
+  try {
+    const cache = await caches.open(CACHE);
+    if(navigator.onLine){
+      // Store full page response
+      const res = await fetch(location.href, {cache:'reload'});
+      if(res.ok) await cache.put(location.href, res);
+      // Remove stale caches
+      (await caches.keys()).filter(k=>k!==CACHE).forEach(k=>caches.delete(k));
+    }
+  } catch(e){}
+})();
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#0d1520;color:#e2eaf4;font-family:'Space Grotesk','DM Sans','Outfit','Inter',system-ui,-apple-system,sans-serif;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button{font-family:'Space Grotesk','DM Sans','Outfit','Inter',system-ui,-apple-system,sans-serif;cursor:pointer}
+input,textarea{font-family:'Space Grotesk','DM Sans','Outfit','Inter',system-ui,-apple-system,sans-serif}
+::-webkit-scrollbar{display:none}
+#app{max-width:520px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;position:relative;background:#0d1520}
+
+/* ── TOP SECTION TABS ── */
+#section-tabs{display:none}
+
+/* ── SUB HEADER ── */
+#sub-header{padding:max(env(safe-area-inset-top,16px),16px) 14px 12px;background:#0d1520;border-bottom:1px solid #1a2535;min-height:52px;display:flex;align-items:center;justify-content:space-between}
+
+/* ── CONTENT ── */
+#content{flex:1;overflow-y:auto;padding-top:12px;padding-bottom:90px}
+
+/* ── BOTTOM NAV ── */
+#bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;background:rgba(10,18,32,.97);border-top:1px solid #1a2535;display:flex;padding-bottom:max(env(safe-area-inset-bottom,4px),4px);z-index:20}
+.nav-item{flex:1;padding:10px 0 4px;background:transparent;border:none;display:flex;flex-direction:column;align-items:center;gap:3px}
+.nav-icon{font-size:20px;line-height:1}
+.nav-label{font-size:10px;font-weight:600;letter-spacing:.05em}
+.nav-dot{width:18px;height:2px;background:#f5a623;border-radius:2px}
+.nav-btn{width:28px;height:28px;border:1px solid #1e2f45;background:#101d2c;color:#b0c4de;border-radius:7px;font-size:18px;display:flex;align-items:center;justify-content:center;padding:0}
+
+/* ── GOALS: TODAY ── */
+.today-wrap{padding:0 14px}
+.today-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.today-date{font-size:19px;font-weight:700;letter-spacing:-.02em}
+.today-label{font-size:11px;color:#f5a623;margin-top:3px;letter-spacing:.08em;text-transform:uppercase}
+.seal-wrap{display:flex;flex-direction:column;align-items:center;gap:2px}
+.seal-sub{font-size:9px;color:#4a5568;text-transform:uppercase;letter-spacing:.07em}
+.goal-card{background:#101d2c;border:1.5px solid #1a2535;border-radius:14px;padding:13px 15px;display:flex;align-items:center;gap:13px;margin-bottom:9px;transition:border-color .2s,background .2s}
+.goal-card.done{background:rgba(245,166,35,.05)}
+.goal-icon{font-size:22px;flex-shrink:0}
+.goal-info{flex:1}
+.goal-name{font-size:13px;font-weight:600}
+.goal-status{font-size:11px;margin-top:3px;color:#4a5568}
+.tick-btn{width:42px;height:42px;border-radius:12px;border:2px solid #1e2f45;background:rgba(255,255,255,.04);color:#2d3f55;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+.tick-btn.done{border-color:#f5a623;background:rgba(245,166,35,.18);color:#f5a623}
+.wr-btn{min-width:56px;height:40px;border-radius:11px;border:2px solid #1e2f45;background:rgba(255,255,255,.04);color:#4a5568;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* ── GOALS: MATRIX ── */
+.matrix-wrap{padding-bottom:20px}
+.matrix-header{display:grid;grid-template-columns:90px repeat(7,1fr);padding:0 10px;border-bottom:1px solid #1a2535;margin-bottom:2px}
+.day-col-header{text-align:center;padding:9px 0 7px;position:relative}
+.day-col-header .dname{font-size:10px;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:.04em}
+.day-col-header .ddate{font-size:9px;color:#263040;margin-top:2px}
+.day-col-header.today .dname{color:#f5a623}
+.day-col-header.today .ddate{color:rgba(245,166,35,.7)}
+.day-col-header.today::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:#f5a623}
+.matrix-row{border-bottom:1px solid #131e2d}
+.matrix-row:nth-child(even){background:rgba(255,255,255,.015)}
+.matrix-cells{display:grid;grid-template-columns:90px repeat(7,1fr);padding:9px 10px 0;align-items:center}
+.goal-label-cell{padding-right:4px;display:flex;align-items:center;gap:5px}
+.goal-label-cell .gicon{font-size:13px}
+.goal-label-cell .gname{font-size:11px;font-weight:700;color:#e2eaf4;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62px}
+.goal-label-cell .gprog{font-size:9px;color:#4a5568;margin-top:1px}
+.goal-label-cell .gprog.met{color:#f5a623}
+.cell-wrap{display:flex;justify-content:center;align-items:center;padding:0 2px}
+.cell-btn{width:100%;max-width:38px;height:34px;border-radius:8px;border:1.5px solid #1a2535;background:transparent;color:#2d3f55;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .15s;padding:0}
+.cell-btn.today-col{border-color:#253650;background:rgba(255,255,255,.04)}
+.cell-btn.checked{border-color:#f5a623;background:rgba(245,166,35,.15);color:#f5a623}
+.cell-btn.wr{font-size:9px;font-weight:800}
+.prog-bar-wrap{padding:5px 10px 7px;padding-left:calc(90px + 10px)}
+.prog-bar-bg{background:#131e2d;border-radius:3px;height:3px;overflow:hidden}
+.prog-bar-fill{height:100%;border-radius:3px;transition:width .4s}
+
+/* ── GOALS: SUMMARY ── */
+.summary-wrap{padding:0 14px}
+.score-card{background:linear-gradient(135deg,#0d1f35,#101d2c);border:1.5px solid #1e2f45;border-radius:18px;padding:20px 16px;margin-bottom:12px;display:flex;align-items:center;gap:16px}
+.score-card-text .sc-label{font-size:11px;color:#7a8fa6;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px}
+.score-card-text .sc-pct{font-size:26px;font-weight:700;color:#f5a623;letter-spacing:-.02em}
+.score-card-text .sc-msg{font-size:12px;color:#b0c4de;margin-top:5px}
+.score-card-text .sc-range{font-size:10px;color:#4a5568;margin-top:4px}
+.sum-goal{background:#101d2c;border:1.5px solid #1a2535;border-radius:13px;padding:12px 14px;margin-bottom:9px}
+.sum-goal.met{border-color:rgba(245,166,35,.25)}
+.sum-goal-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sum-goal-left{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.sum-goal-left span{font-size:17px}
+.sum-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;color:#b0c4de;background:rgba(176,196,222,.08)}
+.sum-badge.met{color:#f5a623;background:rgba(245,166,35,.1)}
+.sum-pct{font-size:10px;color:#4a5568;margin-top:4px}
+
+
+
+/* ── LEGEND ── */
+.legend{margin:12px 10px 0;padding:10px 12px;background:#0a1220;border-radius:12px;border:1px solid #1a2535}
+.legend-title{font-size:10px;color:#4a5568;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.legend-items{display:flex;gap:7px;flex-wrap:wrap}
+.legend-chip{font-size:11px;font-weight:700;border-radius:8px;padding:3px 9px}
+
+
+
+/* Empty state */
+.empty-state{text-align:center;padding:32px 20px;color:#2d3f55;font-size:13px}
+.empty-state .ei{font-size:32px;margin-bottom:10px}
+
+/* Week score small */
+.week-score-small{text-align:right}
+.week-score-small .wslabel{font-size:10px;color:#4a5568;text-transform:uppercase;letter-spacing:.07em}
+.week-score-small .wspct{font-size:15px;font-weight:700}
+.week-nav{display:flex;align-items:center;gap:8px}
+.week-nav-info{text-align:center;min-width:110px}
+.week-nav-info .wrange{font-size:11px;color:#b0c4de;font-weight:600}
+.week-nav-info .wcurrent{font-size:10px;color:#f5a623;margin-top:1px}
+
+/* ── MODALS (shared) ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.modal-box{background:#0d1f35;border-radius:20px 20px 0 0;padding:20px 16px max(env(safe-area-inset-bottom,16px),16px);width:100%;max-width:520px;border-top:1px solid #1e2f45}
+.modal-title{font-size:14px;font-weight:700;color:#e2eaf4;margin-bottom:16px;text-align:center}
+.modal-close{width:100%;padding:12px;background:transparent;border:1.5px solid #1e2f45;border-radius:12px;color:#7a8fa6;font-size:13px;font-weight:600;margin-top:14px}
+
+/* ── MANAGE HABITS MODAL ── */
+.mh-item{background:#0d1520;border:1.5px solid #1e2f45;border-radius:13px;padding:11px 12px;display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.mh-drag{color:#2d3f55;font-size:16px;cursor:grab;padding:0 2px;flex-shrink:0;touch-action:none;user-select:none}
+.mh-drag:active{cursor:grabbing}
+.mh-icon-btn{width:38px;height:38px;border-radius:10px;border:1.5px solid #1e2f45;background:#101d2c;font-size:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}
+.mh-label{flex:1;font-size:13px;font-weight:600;color:#e2eaf4;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mh-target{width:36px;text-align:center;padding:6px 0;background:#101d2c;border:1.5px solid #1e2f45;border-radius:9px;color:#f5a623;font-size:13px;font-weight:700;outline:none}
+.mh-del{width:30px;height:30px;border-radius:8px;border:none;background:rgba(255,80,80,.07);color:#4a5568;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}
+.mh-del:active{background:rgba(255,80,80,.22);color:#ff5050}
+.mh-add-row{display:flex;gap:8px;margin-top:10px;align-items:center}
+.mh-add-icon{width:44px;height:44px;border-radius:11px;border:1.5px solid #1e2f45;background:#101d2c;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.mh-add-input{flex:1;padding:10px 12px;background:#101d2c;border:1.5px solid #1e2f45;border-radius:11px;color:#e2eaf4;font-size:13px;outline:none}
+.mh-add-input:focus{border-color:#f5a623}
+.mh-add-input::placeholder{color:#3d5068}
+.mh-add-btn{width:44px;height:44px;border-radius:11px;border:none;background:#f5a623;color:#0d1520;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}
+.mh-section-title{font-size:11px;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:.1em;margin:14px 0 8px}
+/* Emoji picker */
+.ep-overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-end;justify-content:center}
+.ep-box{background:#0d1f35;border-radius:20px 20px 0 0;padding:16px 12px max(env(safe-area-inset-bottom,16px),16px);width:100%;max-width:520px;border-top:1px solid #1e2f45;max-height:70vh;display:flex;flex-direction:column}
+.ep-search{width:100%;padding:9px 12px;background:#0d1520;border:1.5px solid #1e2f45;border-radius:11px;color:#e2eaf4;font-size:14px;outline:none;margin-bottom:12px;box-sizing:border-box}
+.ep-search:focus{border-color:#f5a623}
+.ep-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;overflow-y:auto;flex:1;font-size:24px;line-height:1}
+.ep-btn{padding:6px 0;border-radius:8px;border:none;background:transparent;font-size:22px;line-height:1.3;cursor:pointer;text-align:center;transition:background .1s;font-family:Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif}
+.ep-btn:active{background:#1a2535}
+.mh-modal-box{max-height:80vh;overflow-y:auto}
+.mh-modal-box::-webkit-scrollbar{display:none}
+.mh-item.dragging{opacity:.4;border-style:dashed}
+.mh-item.drag-over{border-color:#f5a623;background:#101d2c}
+
+/* ── TICK STATES: missed (x) and NA ── */
+.tick-btn.missed{border-color:#ff5050;background:rgba(255,80,80,.15);color:#ff5050}
+.tick-btn.skipped{border-color:#4a5568;background:rgba(74,85,104,.18);color:#7a8fa6}
+.cell-btn.missed{border-color:#ff5050;background:rgba(255,80,80,.13);color:#ff5050}
+.cell-btn.skipped{border-color:#2d3f55;background:rgba(45,63,85,.18);color:#4a5568}
+
+/* ── STATE DROPDOWN ── */
+.state-drop-overlay{position:fixed;inset:0;z-index:60;background:transparent}
+.state-drop{position:fixed;z-index:61;background:#0d1f35;border:1.5px solid #1e2f45;border-radius:14px;padding:6px;min-width:150px;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+.state-drop-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;border:none;background:transparent;width:100%;cursor:pointer;font-size:13px;font-weight:600;color:#b0c4de;font-family:inherit;text-align:left}
+.state-drop-item:active{background:#1a2535}
+.state-drop-item .sdi-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="section-tabs"></div>
+  <div id="sub-header"></div>
+  <div id="content"></div>
+  <div id="bottom-nav"></div>
+  <div id="modal-root"></div>
+</div>
+
+<script>
+// ── GOALS CONFIG ─────────────────────────────────────────────────────────────
+const DEFAULT_GOALS = [
+  {id:"naam_jap",       label:"Naam Jap",      target:5, icon:"🕉️"},
+  {id:"deep_breathing", label:"Deep Breathing", target:5, icon:"🌬️"},
+  {id:"workout",        label:"Workout",         target:4, icon:"💪"},
+  {id:"walk_run",       label:"Walk / Run",      target:5, icon:"🏃", multiMode:true},
+  {id:"study",          label:"Study",           target:4, icon:"📖"},
+  {id:"book_reading",   label:"Book Reading",    target:4, icon:"📚"},
+];
+function loadGoals(){ try{ const g=JSON.parse(localStorage.getItem('tapasya:goals:config')); return (g&&g.length)?g:JSON.parse(JSON.stringify(DEFAULT_GOALS)); }catch{ return JSON.parse(JSON.stringify(DEFAULT_GOALS)); } }
+function saveGoals(g){ try{ localStorage.setItem('tapasya:goals:config',JSON.stringify(g)); }catch{} }
+let GOALS = loadGoals();
+const DAYS_FULL  = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const DAYS_SHORT = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+const WR_STATES  = [null,"walk","run","both","x","na"];
+const WR_META    = {
+  walk:{label:"Walk",      short:"W",   color:"#5ba3d9",bg:"rgba(91,163,217,0.18)"},
+  run: {label:"Run",       short:"R",   color:"#50c878",bg:"rgba(80,200,120,0.18)"},
+  both:{label:"Walk + Run",short:"W+R", color:"#f5a623",bg:"rgba(245,166,35,0.18)"},
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+const today = new Date();
+let state = {
+  section: "goals",
+  goalsTab: "today",        // "today" | "week" | "stats"
+  viewDayIdx: null,          // null = always use today; number = browsing a specific day
+  weekKey: getWeekKey(today),
+  ticks: {},
+};
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function pad(n){ return String(n).padStart(2,'0'); }
+function dateKey(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function parseDateKey(k){ const [y,m,d]=k.split('-').map(Number); return new Date(y,m-1,d); }
+function getWeekKey(date){
+  const d=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+  const day=d.getDay(), diff=d.getDate()-day+(day===0?-6:1);
+  d.setDate(diff);
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+}
+function parseWeekKey(wk){ const [y,m,d]=wk.split('-').map(Number); return new Date(y,m-1,d); }
+function getWeekDates(wk){
+  const s=parseWeekKey(wk);
+  return Array.from({length:7},(_,i)=>{ const d=new Date(s); d.setDate(s.getDate()+i); return d; });
+}
+function fmtDate(date){ return date.getDate()+' '+date.toLocaleString("default",{month:"short"}); }
+function fmtDateFull(date){ return DAYS_FULL[date.getDay()===0?6:date.getDay()-1]+', '+fmtDate(date); }
+function todayDayIdx(){ const d=new Date().getDay(); return d===0?6:d-1; }
+function todayKey(){ return dateKey(new Date()); }
+function isToday(dk){ return dk===todayKey(); }
+
+function el(tag,attrs,children){
+  const e=document.createElement(tag);
+  if(attrs) Object.entries(attrs).forEach(([k,v])=>{
+    if(k==='style'&&typeof v==='object'){Object.assign(e.style,v)}
+    else if(k==='class'){e.className=v}
+    else{ e.setAttribute(k,v); }
+  });
+  if(children)(Array.isArray(children)?children:[children]).forEach(c=>{
+    if(c==null||c===false)return;
+    e.appendChild(typeof c==='string'?document.createTextNode(c):c);
+  });
+  return e;
+}
+
+// ── STORAGE ───────────────────────────────────────────────────────────────────
+function loadTicks(wk){ try{ return JSON.parse(localStorage.getItem('tapasya:goals:'+wk))||{}; }catch{ return {}; } }
+function saveTicks(wk,t){ try{ localStorage.setItem('tapasya:goals:'+wk,JSON.stringify(t)); }catch{} }
+
+function genId(){ return Math.random().toString(36).slice(2,9); }
+
+
+// ── TICK VALUE HELPERS ────────────────────────────────────────────────────────
+// Values: null=empty, true=done, 'x'=missed, 'na'=planned skip
+function getTickVal(ticks, goalId, dayIdx){
+  return ticks[`${goalId}:${dayIdx}`] ?? null;
+}
+function setTickVal(ticks, goalId, dayIdx, val){
+  if(val === null) delete ticks[`${goalId}:${dayIdx}`];
+  else ticks[`${goalId}:${dayIdx}`] = val;
+}
+function cycleTickVal(cur){ // null → true (done) → 'x' (missed) → 'na' → null
+  if(cur === null || cur === undefined) return true;
+  if(cur === true) return 'x';
+  if(cur === 'x') return 'na';
+  return null; // 'na' → clear
+}
+// For scoring: only true counts as done; x and na do NOT count
+function isDone(ticks,goalId,dayIdx){
+  if(goalId==="walk_run") return !!ticks[`walk_run:${dayIdx}`] && ticks[`walk_run:${dayIdx}`]!=='x' && ticks[`walk_run:${dayIdx}`]!=='na';
+  const v = ticks[`${goalId}:${dayIdx}`];
+  return v === true;
+}
+// Scoring: NA days are excluded from target denominator
+function goalProgress(ticks, goalId, target){
+  let done=0, naCount=0;
+  for(let i=0;i<7;i++){
+    const v = goalId==='walk_run' ? ticks[`walk_run:${i}`]??null : (ticks[`${goalId}:${i}`]??null);
+    if(v===true||(v&&v!=='x'&&v!=='na')) done++;
+    else if(v==='na') naCount++;
+  }
+  const effectiveTarget = Math.max(1, target - naCount);
+  return {count:done, naCount, pct:Math.min(Math.round(done/effectiveTarget*100),100)};
+}
+
+// ── STATE DROPDOWN ────────────────────────────────────────────────────────────
+let _dropTimer=null;
+function showStateDropdown(e, goalId, dayIdx, isWR, anchorEl){
+  e.preventDefault(); e.stopPropagation();
+  closeStateDropdown();
+
+  const STATE_OPTIONS = isWR ? [
+    {val:null,   label:'Clear',   icon:'○', color:'#2d3f55', bg:'#2d3f55'},
+    {val:'walk', label:'Walk',    icon:'W', color:'#5ba3d9', bg:'#5ba3d9'},
+    {val:'run',  label:'Run',     icon:'R', color:'#50c878', bg:'#50c878'},
+    {val:'both', label:'Walk+Run',icon:'W+R',color:'#f5a623',bg:'#f5a623'},
+    {val:'x',    label:'Missed',  icon:'✕', color:'#ff5050', bg:'#ff5050'},
+    {val:'na',   label:'N/A',     icon:'—', color:'#4a5568', bg:'#4a5568'},
+  ] : [
+    {val:null,   label:'Clear',   icon:'○', color:'#2d3f55', bg:'#2d3f55'},
+    {val:true,   label:'Done',    icon:'✓', color:'#f5a623', bg:'#f5a623'},
+    {val:'x',    label:'Missed',  icon:'✕', color:'#ff5050', bg:'#ff5050'},
+    {val:'na',   label:'N/A',     icon:'—', color:'#4a5568', bg:'#4a5568'},
+  ];
+
+  const rect = anchorEl.getBoundingClientRect();
+  const drop = document.createElement('div');
+  drop.className = 'state-drop';
+  drop.id = 'state-drop';
+
+  // Position: prefer below, flip up if near bottom
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const dropH = STATE_OPTIONS.length * 44 + 12;
+  let top = spaceBelow > dropH ? rect.bottom + 6 : rect.top - dropH - 6;
+  let left = Math.min(rect.left, window.innerWidth - 170);
+  drop.style.top = top + 'px';
+  drop.style.left = left + 'px';
+
+  STATE_OPTIONS.forEach(opt => {
+    const item = document.createElement('button');
+    item.className = 'state-drop-item';
+    item.innerHTML = `<span class="sdi-dot" style="background:${opt.bg};opacity:${opt.val===null?0.3:0.85}"></span><span>${opt.icon}</span><span>${opt.label}</span>`;
+    item.addEventListener('click', ev => {
+      ev.stopPropagation();
+      closeStateDropdown();
+      if(isWR){
+        state.ticks[`walk_run:${dayIdx}`] = opt.val;
+        if(opt.val===null) delete state.ticks[`walk_run:${dayIdx}`];
+      } else {
+        setTickVal(state.ticks, goalId, dayIdx, opt.val);
+      }
+      saveTicks(state.weekKey, state.ticks);
+      render();
+    });
+    drop.appendChild(item);
+  });
+
+  // Backdrop to close
+  const overlay = document.createElement('div');
+  overlay.className = 'state-drop-overlay';
+  overlay.id = 'state-drop-overlay';
+  overlay.addEventListener('click', closeStateDropdown);
+  overlay.addEventListener('touchstart', closeStateDropdown);
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(drop);
+}
+function closeStateDropdown(){
+  document.getElementById('state-drop')?.remove();
+  document.getElementById('state-drop-overlay')?.remove();
+}
+function attachTickHandlers(btn, goalId, dayIdx, isWR){
+  // Short tap = simple cycle (done/undone for normal; WR cycle for walk_run)
+  let pressTimer = null;
+  const onLong = (e) => { showStateDropdown(e, goalId, dayIdx, isWR, btn); };
+
+  btn.addEventListener('mousedown', () => { pressTimer = setTimeout(() => onLong({preventDefault:()=>{},stopPropagation:()=>{}}), 500); });
+  btn.addEventListener('mouseup',   () => clearTimeout(pressTimer));
+  btn.addEventListener('mouseleave',() => clearTimeout(pressTimer));
+  btn.addEventListener('touchstart',() => { pressTimer = setTimeout(() => onLong({preventDefault:()=>{},stopPropagation:()=>{}}), 500); }, {passive:true});
+  btn.addEventListener('touchend',  () => clearTimeout(pressTimer));
+  btn.addEventListener('touchmove', () => clearTimeout(pressTimer));
+
+  btn.addEventListener('click', () => {
+    clearTimeout(pressTimer);
+    if(isWR){ handleWRTap(dayIdx); return; }
+    const cur = getTickVal(state.ticks, goalId, dayIdx);
+    setTickVal(state.ticks, goalId, dayIdx, cycleTickVal(cur));
+    saveTicks(state.weekKey, state.ticks); render();
+  });
+}
+
+// weekScore uses updated goalProgress above
+function weekScore(ticks){
+  let total=0,earned=0;
+  GOALS.forEach(g=>{
+    const {count,naCount}=goalProgress(ticks,g.id,g.target);
+    total+=Math.max(1,g.target-naCount); earned+=Math.min(count,Math.max(1,g.target-naCount));
+  });
+  return total===0?0:Math.round(earned/total*100);
+}
+
+// ── SEAL SVG ──────────────────────────────────────────────────────────────────
+function makeSeal(pct,size){
+  size=size||88;
+  const r=size*0.38,circ=2*Math.PI*r,sw=size*0.095;
+  const off=circ*(1-Math.min(pct,100)/100);
+  const color=pct>=100?"#f5a623":pct>=85?"#e8c06a":pct>=70?"#b0c4de":pct>=50?"#5ba3d9":"#4a5568";
+  const grade=pct>=100?"S":pct>=85?"A":pct>=70?"B":pct>=50?"C":"D";
+  const cx=size/2,cy=size/2;
+  const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+  svg.setAttribute("width",size);svg.setAttribute("height",size);
+  svg.setAttribute("viewBox",`0 0 ${size} ${size}`);svg.style.display="block";
+  function circ2(ex){ const c=document.createElementNS("http://www.w3.org/2000/svg","circle"); Object.entries(ex).forEach(([k,v])=>c.setAttribute(k,v)); return c; }
+  function txt(t,y,fs,fill,fw){
+    const e=document.createElementNS("http://www.w3.org/2000/svg","text");
+    e.setAttribute("x",cx);e.setAttribute("y",y);e.setAttribute("text-anchor","middle");
+    e.setAttribute("fill",fill);e.setAttribute("font-size",fs);e.setAttribute("font-weight",fw||"700");
+    e.setAttribute("font-family","'Space Grotesk',sans-serif");e.textContent=t;return e;
+  }
+  svg.appendChild(circ2({cx,cy,r,fill:"none",stroke:"#1e2a3a","stroke-width":sw}));
+  const arc=circ2({cx,cy,r,fill:"none",stroke:color,"stroke-width":sw,"stroke-dasharray":circ,"stroke-dashoffset":off,"stroke-linecap":"round",transform:`rotate(-90 ${cx} ${cy})`});
+  arc.style.transition="stroke-dashoffset 0.6s ease,stroke 0.4s";
+  svg.appendChild(arc);
+  svg.appendChild(txt(grade,cy-2,size*0.22,color));
+  svg.appendChild(txt(Math.round(pct)+'%',cy+size*0.155,size*0.115,"#7a8fa6","400"));
+  return svg;
+}
+
+// ── WR DEBOUNCE ───────────────────────────────────────────────────────────────
+const wrLastTouch={};
+function handleWRTap(dayIdx){
+  const now=Date.now();
+  if(now-(wrLastTouch[dayIdx]||0)<500)return;
+  wrLastTouch[dayIdx]=now;
+  const cur=state.ticks[`walk_run:${dayIdx}`]||null;
+  state.ticks[`walk_run:${dayIdx}`]=WR_STATES[(WR_STATES.indexOf(cur)+1)%WR_STATES.length];
+  saveTicks(state.weekKey,state.ticks);render();
+}
+let todayWRLast=0;
+function handleTodayWRTap(tIdx){
+  const now=Date.now();if(now-todayWRLast<500)return;todayWRLast=now;handleWRTap(tIdx);
+}
+
+// ── RENDER: SECTION TABS ─────────────────────────────────────────────────────
+function renderSectionTabs(){ /* hidden — habits only */ }
+
+// ── RENDER: SUB HEADER ────────────────────────────────────────────────────────
+function renderSubHeader(){
+  const sh=document.getElementById('sub-header');sh.innerHTML='';
+  if(state.goalsTab==='today'){
+    const ws=weekScore(state.ticks);
+    const wsColor=ws>=100?"#f5a623":ws>=70?"#b0c4de":"#4a5568";
+    const manageBtn=el('button',{class:'nav-btn',style:{marginRight:'auto',fontSize:'14px',width:'34px',height:'34px'}},'⚙️');
+    manageBtn.title='Manage Habits';
+    manageBtn.addEventListener('click',()=>{ state.manageHabitsOpen=true; render(); });
+    sh.appendChild(manageBtn);
+    sh.appendChild(el('div',{class:'week-score-small'},[
+      el('div',{class:'wslabel'},'Week Score'),
+      el('div',{class:'wspct',style:{color:wsColor}},Math.round(ws)+'%'),
+    ]));
+    sh.style.justifyContent='space-between';
+  } else {
+    sh.style.justifyContent='space-between';
+    const isCurrentWeek=state.weekKey===getWeekKey(new Date());
+    const weekDates=getWeekDates(state.weekKey);
+    const nav=el('div',{class:'week-nav'});
+    const prev=el('button',{class:'nav-btn'},'‹');
+    prev.addEventListener('click',()=>{
+      const d=parseWeekKey(state.weekKey);d.setDate(d.getDate()-7);
+      state.weekKey=getWeekKey(d);state.ticks=loadTicks(state.weekKey);render();
+    });
+    const next=el('button',{class:'nav-btn'},'›');
+    next.addEventListener('click',()=>{
+      const d=parseWeekKey(state.weekKey);d.setDate(d.getDate()+7);
+      state.weekKey=getWeekKey(d);state.ticks=loadTicks(state.weekKey);render();
+    });
+    const info=el('div',{class:'week-nav-info'},[el('div',{class:'wrange'},fmtDate(weekDates[0])+' – '+fmtDate(weekDates[6]))]);
+    if(isCurrentWeek)info.appendChild(el('div',{class:'wcurrent'},'This week'));
+    nav.appendChild(prev);nav.appendChild(info);nav.appendChild(next);
+    sh.appendChild(nav);
+  }
+}
+
+// ── RENDER: BOTTOM NAV ────────────────────────────────────────────────────────
+function renderBottomNav(){
+  const bn=document.getElementById('bottom-nav');bn.innerHTML='';
+  const tabs=[{id:'today',icon:'☀️',label:'Today'},{id:'week',icon:'📅',label:'Week'},{id:'stats',icon:'📊',label:'Summary'}];
+  tabs.forEach(t=>{
+    const active=state.goalsTab===t.id;
+    const btn=el('button',{class:'nav-item'});
+    btn.appendChild(el('span',{class:'nav-icon',style:{filter:active?'none':'grayscale(0.6) opacity(0.45)'}},t.icon));
+    btn.appendChild(el('span',{class:'nav-label',style:{color:active?'#f5a623':'#3d5068'}},t.label));
+    if(active){ const dot=el('div',{class:'nav-dot'}); btn.appendChild(dot); }
+    btn.addEventListener('click',()=>{ state.goalsTab=t.id; if(t.id==='today'){ state.viewDayIdx=null; } render(); });
+    bn.appendChild(btn);
+  });
+}
+
+// ── RENDER: GOALS TODAY ───────────────────────────────────────────────────────
+function renderGoalsToday(){
+  const realTodayIdx=todayDayIdx();
+  // viewDayIdx: null or undefined means "today"; otherwise use the stored value
+  if(state.viewDayIdx===null||state.viewDayIdx===undefined) state.viewDayIdx=realTodayIdx;
+  const tIdx=state.viewDayIdx;
+  const isViewingToday=(tIdx===realTodayIdx && state.weekKey===getWeekKey(new Date()));
+  const ws=weekScore(state.ticks);
+  const weekDates=getWeekDates(state.weekKey);
+  const wrap=el('div',{class:'today-wrap'});
+  const sealWrap=el('div',{class:'seal-wrap'});
+  sealWrap.appendChild(makeSeal(ws,66));
+  sealWrap.appendChild(el('div',{class:'seal-sub'},'Week'));
+
+  // Nav row: ← Day label / Today badge →
+  const navRow=el('div',{class:'today-header',style:{alignItems:'center'}});
+  const prevBtn=el('button',{class:'nav-btn',style:{fontSize:'18px',width:'36px',height:'36px',flexShrink:'0'}}, '‹');
+  prevBtn.addEventListener('click',()=>{
+    if(tIdx>0){ state.viewDayIdx=tIdx-1; render(); }
+    else {
+      // go to previous week, day 6
+      const prevWeekDate=new Date(getWeekDates(state.weekKey)[0]);
+      prevWeekDate.setDate(prevWeekDate.getDate()-7);
+      state.weekKey=getWeekKey(prevWeekDate);
+      state.ticks=loadTicks(state.weekKey);
+      state.viewDayIdx=6;
+      render();
+    }
+  });
+  const nextBtn=el('button',{class:'nav-btn',style:{fontSize:'18px',width:'36px',height:'36px',flexShrink:'0'}}, '›');
+  const isAtFutureBound=(tIdx>=6 && state.weekKey===getWeekKey(new Date()) && tIdx>=realTodayIdx);
+  nextBtn.disabled=isAtFutureBound;
+  nextBtn.style.opacity=isAtFutureBound?'0.25':'1';
+  nextBtn.addEventListener('click',()=>{
+    if(isAtFutureBound) return;
+    if(tIdx<6){ state.viewDayIdx=tIdx+1; render(); }
+    else {
+      // go to next week, day 0 — but only if not in current week beyond today
+      const nextWeekDate=new Date(getWeekDates(state.weekKey)[0]);
+      nextWeekDate.setDate(nextWeekDate.getDate()+7);
+      const nwk=getWeekKey(nextWeekDate);
+      if(nwk<=getWeekKey(new Date())){
+        state.weekKey=nwk;
+        state.ticks=loadTicks(state.weekKey);
+        state.viewDayIdx=0;
+        render();
+      }
+    }
+  });
+
+  const dayLabel=el('div',{style:{flex:'1',textAlign:'center'}});
+  const dateStr=DAYS_FULL[tIdx]+', '+fmtDate(weekDates[tIdx]);
+  dayLabel.appendChild(el('div',{class:'today-date'},dateStr));
+  const badge=isViewingToday
+    ? el('div',{class:'today-label'},'Today')
+    : (()=>{
+        const b=el('button',{class:'today-label',style:{background:'rgba(245,166,35,.1)',border:'1px solid rgba(245,166,35,.3)',borderRadius:'8px',padding:'2px 8px',cursor:'pointer',color:'#f5a623',fontSize:'11px'}}, 'Jump to Today');
+        b.addEventListener('click',()=>{ state.viewDayIdx=realTodayIdx; state.weekKey=getWeekKey(new Date()); state.ticks=loadTicks(state.weekKey); render(); });
+        return b;
+      })();
+  dayLabel.appendChild(badge);
+
+  navRow.appendChild(prevBtn);
+  navRow.appendChild(dayLabel);
+  navRow.appendChild(nextBtn);
+  navRow.appendChild(sealWrap);
+  wrap.appendChild(navRow);
+  GOALS.forEach(goal=>{
+    const isWR=goal.multiMode;
+    const rawVal=isWR?(state.ticks[`walk_run:${tIdx}`]??null):(state.ticks[`${goal.id}:${tIdx}`]??null);
+    const wrMeta=(isWR&&rawVal&&rawVal!=='x'&&rawVal!=='na')?WR_META[rawVal]:null;
+    const isDoneVal=isWR?(!!rawVal&&rawVal!=='x'&&rawVal!=='na'):(rawVal===true);
+    const isMissed=rawVal==='x', isNA=rawVal==='na';
+    let borderColor='#1a2535';
+    if(isDoneVal) borderColor=wrMeta?wrMeta.color:'#f5a623';
+    else if(isMissed) borderColor='rgba(255,80,80,.35)';
+    else if(isNA) borderColor='#2d3f55';
+    const card=el('div',{class:'goal-card'+(isDoneVal?' done':''),style:{borderColor}});
+    let stTxt='Not logged',stColor='#4a5568';
+    if(isWR&&wrMeta){stTxt=wrMeta.label;stColor=wrMeta.color;}
+    else if(rawVal==='x'){stTxt='Missed ✕';stColor='#ff5050';}
+    else if(rawVal==='na'){stTxt='N/A — planned skip';stColor='#4a5568';}
+    else if(isWR){stTxt='Hold to log';}
+    else if(isDoneVal){stTxt='Done ✓';stColor='#f5a623';}
+    card.appendChild(el('span',{class:'goal-icon'},goal.icon));
+    card.appendChild(el('div',{class:'goal-info'},[
+      el('div',{class:'goal-name'},goal.label),
+      el('div',{class:'goal-status',style:{color:stColor}},stTxt),
+    ]));
+    if(isWR){
+      const btn=el('button',{class:'wr-btn'});
+      if(wrMeta){btn.style.borderColor=wrMeta.color;btn.style.background=wrMeta.bg;btn.style.color=wrMeta.color;btn.textContent=wrMeta.short;}
+      else if(isMissed){btn.style.borderColor='#ff5050';btn.style.background='rgba(255,80,80,.15)';btn.style.color='#ff5050';btn.textContent='✕';}
+      else if(isNA){btn.style.borderColor='#2d3f55';btn.style.color='#4a5568';btn.textContent='N/A';}
+      else{btn.textContent='Log';}
+      attachTickHandlers(btn,'walk_run',tIdx,true);
+      card.appendChild(btn);
+    } else {
+      let btnCls='tick-btn'+(isDoneVal?' done':isMissed?' missed':isNA?' skipped':'');
+      const btn=el('button',{class:btnCls});
+      btn.textContent=isDoneVal?'✓':isMissed?'✕':isNA?'—':'';
+      attachTickHandlers(btn,goal.id,tIdx,false);
+      card.appendChild(btn);
+    }
+    wrap.appendChild(card);
+  });
+  wrap.appendChild(makeLegend());
+  return wrap;
+}
+
+// ── RENDER: GOALS MATRIX ──────────────────────────────────────────────────────
+function renderGoalsMatrix(){
+  const tIdx=todayDayIdx();
+  const isCurrentWeek=state.weekKey===getWeekKey(new Date());
+  const weekDates=getWeekDates(state.weekKey);
+  const wrap=el('div',{class:'matrix-wrap'});
+  const hdr=el('div',{class:'matrix-header'});
+  hdr.appendChild(el('div'));
+  weekDates.forEach((d,i)=>{
+    const isT=isCurrentWeek&&i===tIdx;
+    const col=el('div',{class:'day-col-header'+(isT?' today':'')});
+    col.appendChild(el('div',{class:'dname'},DAYS_FULL[i].slice(0,1)));
+    col.appendChild(el('div',{class:'ddate'},d.getDate()+'/'+(d.getMonth()+1)));
+    hdr.appendChild(col);
+  });
+  wrap.appendChild(hdr);
+  GOALS.forEach(goal=>{
+    const {count,naCount,pct}=goalProgress(state.ticks,goal.id,goal.target);
+    const effT=Math.max(1,goal.target-naCount),met=count>=effT;
+    const row=el('div',{class:'matrix-row'});
+    const cells=el('div',{class:'matrix-cells'});
+    cells.appendChild(el('div',{class:'goal-label-cell'},[
+      el('span',{class:'gicon'},goal.icon),
+      el('div',{},[
+        el('div',{class:'gname'},goal.label),
+        el('div',{class:'gprog'+(met?' met':'')},count+'/'+effT+(naCount?` (${naCount}N/A)`:'')),
+      ]),
+    ]));
+    for(let di=0;di<7;di++){
+      const isT=isCurrentWeek&&di===tIdx;
+      const isWR=goal.multiMode;
+      const rawVal=isWR?(state.ticks[`walk_run:${di}`]??null):(state.ticks[`${goal.id}:${di}`]??null);
+      const wrMeta=(isWR&&rawVal&&rawVal!=='x'&&rawVal!=='na')?WR_META[rawVal]:null;
+      const isDoneVal=isWR?(!!rawVal&&rawVal!=='x'&&rawVal!=='na'):(rawVal===true);
+      const isMissed=rawVal==='x', isNA=rawVal==='na';
+      let btnCls='cell-btn'+(isWR?' wr':'');
+      if(isDoneVal) btnCls+=' checked';
+      else if(isMissed) btnCls+=' missed';
+      else if(isNA) btnCls+=' skipped';
+      else if(isT) btnCls+=' today-col';
+      const btn=el('button',{class:btnCls});
+      if(isWR){
+        if(wrMeta){btn.style.borderColor=wrMeta.color;btn.style.background=wrMeta.bg;btn.style.color=wrMeta.color;btn.textContent=wrMeta.short;}
+        else if(isMissed){btn.style.borderColor='#ff5050';btn.style.background='rgba(255,80,80,.13)';btn.style.color='#ff5050';btn.textContent='✕';}
+        else if(isNA){btn.style.color='#4a5568';btn.textContent='—';}
+        else if(isT){btn.style.borderColor='#253650';btn.style.background='rgba(255,255,255,0.04)';}
+      } else {
+        btn.textContent=isDoneVal?'✓':isMissed?'✕':isNA?'—':'';
+      }
+      attachTickHandlers(btn,goal.id,di,isWR);
+      cells.appendChild(el('div',{class:'cell-wrap'},btn));
+    }
+    row.appendChild(cells);
+    const pw=el('div',{class:'prog-bar-wrap'});
+    const bg=el('div',{class:'prog-bar-bg'});
+    const fill=el('div',{class:'prog-bar-fill'});
+    fill.style.width=pct+'%';fill.style.background=met?'linear-gradient(90deg,#f5a623,#e8c06a)':'linear-gradient(90deg,#2d6fa4,#5ba3d9)';
+    bg.appendChild(fill);pw.appendChild(bg);row.appendChild(pw);
+    wrap.appendChild(row);
+  });
+  wrap.appendChild(makeLegend());
+  return wrap;
+}
+
+// ── RENDER: GOALS SUMMARY ─────────────────────────────────────────────────────
+function renderGoalsSummary(){
+  const ws=weekScore(state.ticks);
+  const weekDates=getWeekDates(state.weekKey);
+  const grade=ws>=100?"S":ws>=85?"A":ws>=70?"B":ws>=50?"C":"D";
+  const msgs={S:"Perfect week. 🔥",A:"Excellent. Keep it up.",B:"Solid effort. Push harder.",C:"Room to grow. Stay consistent.",D:"Restart. Every day is new."};
+  const wrap=el('div',{class:'summary-wrap'});
+  const sc=el('div',{class:'score-card'});
+  sc.appendChild(makeSeal(ws,90));
+  sc.appendChild(el('div',{class:'score-card-text'},[
+    el('div',{class:'sc-label'},'Week Score'),
+    el('div',{class:'sc-pct'},Math.round(ws)+'%'),
+    el('div',{class:'sc-msg'},msgs[grade]),
+    el('div',{class:'sc-range'},fmtDate(weekDates[0])+' – '+fmtDate(weekDates[6])),
+  ]));
+  wrap.appendChild(sc);
+  GOALS.forEach(goal=>{
+    const {count,naCount,pct}=goalProgress(state.ticks,goal.id,goal.target);
+    const effTarget=Math.max(1,goal.target-naCount);
+    const met=count>=effTarget;
+    const div=el('div',{class:'sum-goal'+(met?' met':'')});
+    const badge=el('span',{class:'sum-badge'+(met?' met':'')},count+'/'+effTarget+(met?' ✓':''));
+    div.appendChild(el('div',{class:'sum-goal-row'},[
+      el('div',{class:'sum-goal-left'},[el('span',{},goal.icon),goal.label]),badge,
+    ]));
+    const bg=el('div',{class:'prog-bar-bg',style:{height:'5px',borderRadius:'5px',background:'#1a2535',overflow:'hidden'}});
+    const fill=el('div',{class:'prog-bar-fill'});
+    fill.style.height='100%';fill.style.borderRadius='5px';fill.style.width=pct+'%';
+    fill.style.background=met?'linear-gradient(90deg,#f5a623,#e8c06a)':'linear-gradient(90deg,#2d6fa4,#5ba3d9)';
+    bg.appendChild(fill);div.appendChild(bg);
+    const naNote=naCount>0?` · ${naCount} N/A`:'';
+    div.appendChild(el('div',{class:'sum-pct'},Math.round(pct)+'% of weekly target'+naNote));
+    wrap.appendChild(div);
+  });
+  return wrap;
+}
+
+// ── EMOJI PICKER DATA ─────────────────────────────────────────────────────────
+// Emoji list: [emoji, "search keywords"]
+const EMOJI_LIST = [
+  ['🕉️','om meditation spiritual prayer yoga'],
+  ['🧘','yoga meditation mindfulness zen relax'],
+  ['🌬️','wind breath breathing air pranayama'],
+  ['💫','sparkle magic star energy'],
+  ['✨','sparkles magic shine glow'],
+  ['🌟','star glow shine bright'],
+  ['🌞','sun sunrise morning energy'],
+  ['🌙','moon night sleep rest'],
+  ['🕊️','peace dove calm spirit'],
+  ['🧿','evil eye protection amulet'],
+  ['☯️','yin yang balance harmony'],
+  ['🙏','pray hands namaste gratitude'],
+  ['📿','prayer beads rosary mala'],
+  ['🪬','hamsa protection charm'],
+  ['🔮','crystal ball spiritual mystic'],
+  ['🌸','cherry blossom peace calm'],
+  ['🪷','lotus flower spiritual'],
+  ['🕯️','candle light ritual calm'],
+  ['🌺','hibiscus flower bloom'],
+  ['🌼','daisy flower nature calm'],
+  ['🧸','comfort peace relax'],
+  ['☮️','peace symbol calm'],
+  ['🫧','bubbles calm clean'],
+  ['🌈','rainbow hope positive'],
+  ['💪','muscle workout flex strength gym'],
+  ['🏃','run running jog exercise walk'],
+  ['🚴','cycle bike cycling cardio'],
+  ['🏋️','lift weights gym strength training'],
+  ['🤼','wrestle sport fight martial arts'],
+  ['🏊','swim swimming pool water'],
+  ['⛹️','basketball sport ball'],
+  ['🥋','karate martial arts kick'],
+  ['🚵','mountain bike cycle outdoor'],
+  ['🧗','climb wall sport exercise'],
+  ['🤺','fencing sword sport'],
+  ['🎯','target aim focus goal dart'],
+  ['🏄','surf water board sport'],
+  ['🛹','skateboard skate sport'],
+  ['🤸','gymnastics stretch flexibility'],
+  ['🧘‍♂️','man yoga stretch flexibility'],
+  ['🏇','horse riding equestrian sport'],
+  ['⛷️','ski skiing winter sport'],
+  ['🏂','snowboard winter sport'],
+  ['🤾','handball throw sport'],
+  ['🏌️','golf sport outdoor'],
+  ['🎾','tennis racket sport'],
+  ['🏸','badminton sport racket'],
+  ['🥊','boxing punch fight training'],
+  ['🥅','goal sport target net'],
+  ['🎽','running shirt athletic'],
+  ['👟','sneaker shoe run walk'],
+  ['🦵','leg strength squat'],
+  ['🦶','foot walk steps'],
+  ['🏔️','mountain climb peak outdoor'],
+  ['📖','book read study learn open'],
+  ['📚','books library study stack'],
+  ['📝','memo write note journal'],
+  ['💻','laptop computer code work'],
+  ['🎓','graduation study learn school'],
+  ['💼','briefcase work job career'],
+  ['🧪','science test experiment lab'],
+  ['🔬','research microscope study'],
+  ['📊','chart stats data analysis'],
+  ['📈','growth chart up progress'],
+  ['📅','calendar date schedule plan'],
+  ['📋','clipboard list task'],
+  ['✒️','pen write edit'],
+  ['💯','100 perfect score'],
+  ['🔭','telescope astronomy observe'],
+  ['🗺️','map explore navigate'],
+  ['📰','newspaper news read'],
+  ['🖊️','pen write journal'],
+  ['📓','notebook journal write'],
+  ['📔','notebook study'],
+  ['📒','ledger notes record'],
+  ['🗒️','spiral notebook plan'],
+  ['📜','scroll document knowledge'],
+  ['🧾','receipt record track'],
+  ['🖥️','desktop computer work'],
+  ['⌨️','keyboard type write code'],
+  ['🖱️','mouse computer work'],
+  ['📡','antenna signal learn'],
+  ['🧮','abacus math calculate'],
+  ['🔢','numbers math calculate'],
+  ['🍎','apple fruit healthy food diet'],
+  ['🥦','broccoli vegetable healthy food'],
+  ['🥑','avocado healthy food fat'],
+  ['🍓','strawberry fruit food'],
+  ['🍵','tea drink hot warm'],
+  ['🥤','juice drink beverage'],
+  ['💊','pill medicine health tablet'],
+  ['🏥','hospital health medical clinic'],
+  ['🩺','stethoscope doctor health'],
+  ['🥗','salad healthy food greens'],
+  ['🥕','carrot vegetable healthy'],
+  ['🍇','grapes fruit antioxidant'],
+  ['🍊','orange vitamin c fruit'],
+  ['🍋','lemon citrus detox'],
+  ['🫐','blueberry superfood antioxidant'],
+  ['🥝','kiwi fruit vitamin'],
+  ['🍉','watermelon hydration summer'],
+  ['🥒','cucumber vegetable fresh'],
+  ['🌽','corn vegetable fiber'],
+  ['🍄','mushroom healthy immune'],
+  ['🧄','garlic immunity health'],
+  ['🫚','oil healthy fat cooking'],
+  ['🫛','pea vegetable protein'],
+  ['🥜','peanut nut protein'],
+  ['🌰','chestnut nut winter'],
+  ['🍳','cooking food meal cook'],
+  ['🫖','teapot tea warm calm'],
+  ['💧','water hydration drink'],
+  ['🧃','juice pack drink healthy'],
+  ['🩹','bandage heal recovery'],
+  ['🩻','xray health medical'],
+  ['🧬','dna genetics health science'],
+  ['❤️‍🩹','healing recovery care'],
+  ['🫀','heart organ health'],
+  ['🫁','lung breath health'],
+  ['⏰','alarm clock time schedule wake'],
+  ['⏳','hourglass time wait countdown'],
+  ['🗓️','calendar spiral plan schedule'],
+  ['🔥','fire hot streak motivation'],
+  ['💡','idea bulb light think'],
+  ['🔑','key unlock access achieve'],
+  ['🏠','house home family'],
+  ['🛠️','tools fix build work'],
+  ['⚙️','gear settings manage'],
+  ['📌','pin task fixed important'],
+  ['📍','location pin mark place'],
+  ['🗂️','file organise folder'],
+  ['📂','folder open files'],
+  ['🗃️','card file organise'],
+  ['🖨️','printer output work'],
+  ['📠','fax send work'],
+  ['📞','phone call work'],
+  ['📱','mobile phone work'],
+  ['⌚','watch time track'],
+  ['🧭','compass navigate direction'],
+  ['🔋','battery energy charge'],
+  ['⚡','lightning fast energy bolt'],
+  ['🔗','link connect network'],
+  ['📎','paperclip attach connect'],
+  ['✅','check done complete'],
+  ['☑️','checkbox done task'],
+  ['🏁','finish line complete goal'],
+  ['🎯','bullseye target goal'],
+  ['🚀','rocket launch ambition'],
+  ['🛸','ufo innovation future'],
+  ['🌻','sunflower flower nature'],
+  ['🌲','tree nature green evergreen'],
+  ['🌳','tree nature park'],
+  ['🍀','clover leaf lucky nature'],
+  ['🌍','earth world globe nature'],
+  ['⛰️','mountain hike outdoor nature'],
+  ['🌌','galaxy milky way night sky'],
+  ['☀️','sun sunny bright day'],
+  ['🌈','rainbow color weather'],
+  ['❄️','snow cold winter freeze'],
+  ['🌊','ocean wave water calm'],
+  ['🏝️','island paradise relax'],
+  ['🌾','wheat field harvest nature'],
+  ['🍂','autumn leaf fall season'],
+  ['🍁','maple leaf autumn canada'],
+  ['🌵','cactus desert resilience'],
+  ['🪴','plant indoor nature grow'],
+  ['🪸','coral ocean reef'],
+  ['🌏','asia pacific globe earth'],
+  ['🌐','globe world network'],
+  ['🏔️','mountain peak snow cold'],
+  ['🌄','sunrise mountain dawn'],
+  ['🌅','sunset horizon sea'],
+  ['🌇','city sunset evening'],
+  ['🌃','night city stars'],
+  ['🌉','bridge night city'],
+  ['🌁','foggy morning calm'],
+  ['⛺','tent camp outdoor nature'],
+  ['🏕️','camping tent outdoor nature'],
+  ['🛖','hut rustic nature simple'],
+  ['🏆','trophy win award champion'],
+  ['🥇','gold medal first win'],
+  ['🥈','silver medal second'],
+  ['🥉','bronze medal third'],
+  ['🏅','medal award achievement'],
+  ['👑','crown king queen leader'],
+  ['💰','money wealth finance save'],
+  ['🙌','raise hands celebrate'],
+  ['👏','clap applause cheer'],
+  ['🤝','handshake deal partner'],
+  ['🎸','guitar music play'],
+  ['🎊','confetti celebrate party'],
+  ['🎉','party celebrate achievement'],
+  ['🥳','celebrate party success'],
+  ['🎁','gift reward surprise'],
+  ['🪄','magic wand transform'],
+  ['🌠','shooting star wish dream'],
+  ['🎆','fireworks celebrate success'],
+  ['🎇','sparkler celebrate'],
+  ['🏵️','rosette award honor'],
+  ['🎖️','military medal honor'],
+  ['🎗️','ribbon awareness cause'],
+  ['😊','smile happy positive mood'],
+  ['😄','grin happy joyful'],
+  ['🥰','love care affection warm'],
+  ['😌','relieved calm peaceful content'],
+  ['🤗','hug warm embrace care'],
+  ['😤','determination grind hustle'],
+  ['🧐','focus inspect curious analyse'],
+  ['🤔','thinking reflect wonder'],
+  ['😎','cool confident chill'],
+  ['🥺','grateful humble'],
+  ['😴','sleep rest recovery tired'],
+  ['🤩','excited amazed star eyes'],
+  ['💪','strong determined focused'],
+  ['🧗','challenge overcome climb'],
+  ['🫶','love care heart hands'],
+  ['🎨','art paint creative color'],
+  ['✏️','pencil draw sketch write'],
+  ['🖌️','brush paint art creative'],
+  ['🎭','theater art drama perform'],
+  ['🎬','film movie create direct'],
+  ['📸','camera photo capture'],
+  ['🎙️','microphone record speak podcast'],
+  ['🎤','mic sing speak perform'],
+  ['🎧','headphones music listen'],
+  ['🎼','music score compose'],
+  ['🎹','piano music keyboard'],
+  ['🥁','drums music rhythm beat'],
+  ['🎻','violin music strings'],
+  ['🪗','accordion music folk'],
+  ['🪘','drum music tribal beat'],
+  ['✍️','writing hand journal create'],
+  ['📷','photo camera capture memory'],
+  ['🖼️','painting frame art'],
+  ['🗿','statue ancient history'],
+  ['🏺','vase art craft ancient'],
+];
+
+// ── EXPORT / IMPORT ───────────────────────────────────────────────────────────
+function exportData(){
+  const data = {};
+  for(let i=0; i<localStorage.length; i++){
+    const key = localStorage.key(i);
+    if(key && key.startsWith('tapasya:')){
+      try{ data[key] = JSON.parse(localStorage.getItem(key)); }
+      catch{ data[key] = localStorage.getItem(key); }
+    }
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'tapasya-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(file){
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const data = JSON.parse(e.target.result);
+      const keys = Object.keys(data).filter(k => k.startsWith('tapasya:'));
+      if(!keys.length){ alert('No Tapasya data found in this file.'); return; }
+      if(!confirm(`This will restore ${keys.length} data entries and overwrite current data. Continue?`)) return;
+      keys.forEach(k => localStorage.setItem(k, JSON.stringify(data[k])));
+      GOALS = loadGoals();
+      state.ticks = loadTicks(state.weekKey);
+      state.manageHabitsOpen = false;
+      render();
+      alert('✅ Data restored successfully!');
+    } catch(err){
+      alert('Failed to read file. Make sure it\'s a valid Tapasya backup.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ── MANAGE HABITS MODAL ───────────────────────────────────────────────────────
+let _emojiCb = null; // callback when emoji picked
+let _epSearch = '';
+let _dragSrc = null;
+
+function openEmojiPicker(cb){
+  _emojiCb = cb;
+  _epSearch = '';
+  renderEmojiPicker();
+}
+
+function renderEmojiPicker(){
+  const mr = document.getElementById('modal-root');
+  // Remove existing emoji overlay if any
+  const existing = document.getElementById('ep-overlay');
+  if(existing) existing.remove();
+
+  const overlay = el('div',{class:'ep-overlay',id:'ep-overlay'});
+  const box = el('div',{class:'ep-box'});
+  const search = el('input',{class:'ep-search', type:'text', placeholder:'Search emoji\u2026'});
+  search.value = _epSearch;
+  search.addEventListener('input', e => { _epSearch = e.target.value; renderEmojiGrid(grid, _epSearch); });
+  box.appendChild(search);
+  const grid = el('div',{class:'ep-grid'});
+  renderEmojiGrid(grid, _epSearch);
+  box.appendChild(grid);
+  overlay.appendChild(box);
+  overlay.addEventListener('click', e => { if(e.target===overlay){ overlay.remove(); _emojiCb=null; } });
+  mr.appendChild(overlay);
+  setTimeout(()=>search.focus(),100);
+}
+
+function renderEmojiGrid(grid, q){
+  grid.innerHTML = '';
+  const qLow = q ? q.toLowerCase() : '';
+  const list = qLow
+    ? EMOJI_LIST.filter(([emoji, tags]) => tags.includes(qLow) || emoji.includes(qLow))
+    : EMOJI_LIST;
+  list.forEach(([emoji]) => {
+    const btn = document.createElement('button');
+    btn.className = 'ep-btn';
+    // Use innerHTML to ensure emoji renders correctly (not as codepoints)
+    btn.innerHTML = emoji;
+    btn.addEventListener('click',()=>{
+      if(_emojiCb){ _emojiCb(emoji); _emojiCb=null; }
+      document.getElementById('ep-overlay')?.remove();
+      renderManageHabits();
+    });
+    grid.appendChild(btn);
+  });
+}
+
+function renderManageHabits(){
+  const mr = document.getElementById('modal-root');
+  // Remove old manage modal but keep emoji picker if open
+  const existing = document.getElementById('mh-overlay');
+  if(existing) existing.remove();
+  if(!state.manageHabitsOpen) return;
+
+  const overlay = el('div',{class:'modal-overlay',id:'mh-overlay'});
+  const box = el('div',{class:'modal-box mh-modal-box'});
+  box.appendChild(el('div',{class:'modal-title'},'\u2699\ufe0f Manage Habits'));
+
+  // Edit icon for new goal in progress
+  if(!state.mhNewIcon) state.mhNewIcon = '\u2b50';
+
+  // List of current habits
+  box.appendChild(el('div',{class:'mh-section-title'},'Your Habits'));
+
+  GOALS.forEach((goal, idx) => {
+    const item = el('div',{class:'mh-item', 'data-idx':idx});
+
+    // Up / Down arrows
+    const arrowWrap = el('div',{style:{display:'flex',flexDirection:'column',gap:'2px',flexShrink:'0'}});
+    const upBtn = el('button',{class:'mh-drag',style:{fontSize:'13px',lineHeight:'1',padding:'3px 5px',borderRadius:'5px',border:'1px solid #1e2f45',background:'#101d2c',color:idx===0?'#2d3f55':'#b0c4de',cursor:idx===0?'default':'pointer'}}, '▲');
+    const dnBtn = el('button',{class:'mh-drag',style:{fontSize:'13px',lineHeight:'1',padding:'3px 5px',borderRadius:'5px',border:'1px solid #1e2f45',background:'#101d2c',color:idx===GOALS.length-1?'#2d3f55':'#b0c4de',cursor:idx===GOALS.length-1?'default':'pointer'}}, '▼');
+    upBtn.disabled = idx === 0;
+    dnBtn.disabled = idx === GOALS.length - 1;
+    upBtn.addEventListener('click', () => {
+      if(idx === 0) return;
+      [GOALS[idx-1], GOALS[idx]] = [GOALS[idx], GOALS[idx-1]];
+      saveGoals(GOALS); renderManageHabits();
+    });
+    dnBtn.addEventListener('click', () => {
+      if(idx === GOALS.length - 1) return;
+      [GOALS[idx], GOALS[idx+1]] = [GOALS[idx+1], GOALS[idx]];
+      saveGoals(GOALS); renderManageHabits();
+    });
+    arrowWrap.appendChild(upBtn); arrowWrap.appendChild(dnBtn);
+    item.appendChild(arrowWrap);
+
+    // Icon button
+    const iconBtn = document.createElement('button'); iconBtn.className='mh-icon-btn'; iconBtn.innerHTML=goal.icon;
+    iconBtn.addEventListener('click',()=>{
+      openEmojiPicker(newEmoji => {
+        GOALS[idx].icon = newEmoji;
+        saveGoals(GOALS);
+        render();
+      });
+    });
+    item.appendChild(iconBtn);
+
+    // Name (editable inline)
+    const nameInput = el('input',{class:'mh-add-input mh-label', type:'text', value:goal.label, style:{flex:'1',minWidth:'0',height:'36px',padding:'0 10px'}});
+    nameInput.addEventListener('change', e => {
+      GOALS[idx].label = e.target.value.trim() || goal.label;
+      saveGoals(GOALS);
+    });
+    item.appendChild(nameInput);
+
+    // Target number
+    const targetInput = el('input',{class:'mh-target', type:'number', value:goal.target, min:'1', max:'7'});
+    targetInput.addEventListener('change', e => {
+      const v = Math.min(7, Math.max(1, parseInt(e.target.value)||goal.target));
+      GOALS[idx].target = v;
+      saveGoals(GOALS);
+    });
+    item.appendChild(targetInput);
+
+    // Delete
+    const delBtn = el('button',{class:'mh-del'}, '\u00d7');
+    delBtn.addEventListener('click',()=>{
+      if(GOALS.length <= 1){ alert('Need at least 1 habit!'); return; }
+      GOALS.splice(idx, 1);
+      saveGoals(GOALS);
+      render();
+      renderManageHabits();
+    });
+    item.appendChild(delBtn);
+    box.appendChild(item);
+  });
+
+  // Add new habit row
+  box.appendChild(el('div',{class:'mh-section-title'},'Add New Habit'));
+  const addRow = el('div',{class:'mh-add-row'});
+
+  const iconPickBtn = document.createElement('button'); iconPickBtn.className='mh-add-icon'; iconPickBtn.id='mh-new-icon-btn'; iconPickBtn.innerHTML=state.mhNewIcon||'\u2b50';
+  iconPickBtn.addEventListener('click',()=>{
+    openEmojiPicker(e => { state.mhNewIcon=e; renderManageHabits(); });
+  });
+  addRow.appendChild(iconPickBtn);
+
+  const nameIn = el('input',{class:'mh-add-input', type:'text', placeholder:'Habit name\u2026', id:'mh-new-name'});
+  nameIn.value = state.mhNewName||'';
+  nameIn.addEventListener('input', e => state.mhNewName = e.target.value);
+  addRow.appendChild(nameIn);
+
+  const addBtn = el('button',{class:'mh-add-btn'}, '+');
+  addBtn.addEventListener('click',()=>{
+    const name = (state.mhNewName||'').trim();
+    if(!name) return;
+    const id = 'habit_'+Date.now();
+    GOALS.push({id, label:name, target:5, icon:state.mhNewIcon||'\u2b50'});
+    saveGoals(GOALS);
+    state.mhNewName=''; state.mhNewIcon='\u2b50';
+    render();
+    renderManageHabits();
+  });
+  addRow.appendChild(addBtn);
+  box.appendChild(addRow);
+
+  // ── Data Migration ──
+  box.appendChild(el('div',{class:'mh-section-title'},'Data Migration'));
+
+  const exportBtn = el('button',{class:'modal-close',style:{marginTop:'0',color:'#5ba3d9',borderColor:'#5ba3d933',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'}});
+  exportBtn.innerHTML = '📤 Export all data (for migration)';
+  exportBtn.addEventListener('click', exportData);
+  box.appendChild(exportBtn);
+
+  const importLabel = el('label',{style:{display:'block',marginTop:'8px'}});
+  const importBtn = el('button',{class:'modal-close',style:{marginTop:'0',color:'#50c878',borderColor:'#50c87833',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',width:'100%',cursor:'pointer'}});
+  importBtn.innerHTML = '📥 Import data (restore from backup)';
+  const fileInput = el('input',{type:'file',accept:'.json',style:{display:'none'}});
+  fileInput.addEventListener('change', e => { if(e.target.files[0]) importData(e.target.files[0]); });
+  importBtn.addEventListener('click', ()=> fileInput.click());
+  importLabel.appendChild(importBtn);
+  importLabel.appendChild(fileInput);
+  box.appendChild(importLabel);
+
+  const closeBtn = el('button',{class:'modal-close',style:{marginTop:'16px'}},'Done');
+  closeBtn.addEventListener('click',()=>{ state.manageHabitsOpen=false; render(); });
+  box.appendChild(closeBtn);
+
+  overlay.appendChild(box);
+  overlay.addEventListener('click', e => { if(e.target===overlay){ state.manageHabitsOpen=false; render(); } });
+  mr.appendChild(overlay);
+}
+
+// ── HABIT REORDER: handled by ▲▼ buttons in renderManageHabits ──────────────
+
+
+// ── LEGEND ────────────────────────────────────────────────────────────────────
+function makeLegend(){
+  const leg=el('div',{class:'legend'});
+  leg.appendChild(el('div',{class:'legend-title'},'Walk / Run · tap to cycle'));
+  const items=el('div',{class:'legend-items'});
+  Object.entries(WR_META).forEach(([k,v])=>{
+    const chip=el('span',{class:'legend-chip'},v.short+' = '+v.label);
+    chip.style.color=v.color;chip.style.background=v.bg;
+    items.appendChild(chip);
+  });
+  leg.appendChild(items);
+  return leg;
+}
+
+// ── MAIN RENDER ───────────────────────────────────────────────────────────────
+function render(){
+  renderSectionTabs();
+  renderSubHeader();
+  renderBottomNav();
+  renderManageHabits();
+  const content=document.getElementById('content');
+  content.innerHTML='';
+  if(state.goalsTab==='today') content.appendChild(renderGoalsToday());
+  else if(state.goalsTab==='week') content.appendChild(renderGoalsMatrix());
+  else content.appendChild(renderGoalsSummary());
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+state.ticks=loadTicks(state.weekKey);
+render();
+
+// ── OFFLINE INDICATOR ─────────────────────────────────────────────────────────
+(function(){
+  const bar = document.createElement('div');
+  bar.id = 'offline-bar';
+  Object.assign(bar.style, {
+    position:'fixed', top:'0', left:'50%', transform:'translateX(-50%)',
+    width:'100%', maxWidth:'520px', background:'#1a2535',
+    color:'#7a8fa6', fontSize:'11px', fontWeight:'600', textAlign:'center',
+    padding:'6px 0', zIndex:'100', display:'none',
+    letterSpacing:'.05em', borderBottom:'1px solid #f5a62344'
+  });
+  bar.textContent = '📴 Offline — your data is saved locally';
+  document.getElementById('app').appendChild(bar);
+  function updateBar(){ bar.style.display = navigator.onLine ? 'none' : 'block'; }
+  window.addEventListener('online', updateBar);
+  window.addEventListener('offline', updateBar);
+  updateBar();
+})();
+
+// ── A2HS PROMPT ───────────────────────────────────────────────────────────────
+let _deferredInstall = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstall = e;
+  // Show a subtle install nudge after 3s if not already installed
+  setTimeout(() => {
+    if (!_deferredInstall) return;
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+    const nudge = document.createElement('div');
+    nudge.id = 'install-nudge';
+    Object.assign(nudge.style, {
+      position:'fixed', bottom:'72px', left:'50%', transform:'translateX(-50%)',
+      background:'#1a2f4a', border:'1.5px solid #f5a62355', borderRadius:'14px',
+      padding:'10px 14px', display:'flex', alignItems:'center', gap:'10px',
+      zIndex:'30', maxWidth:'320px', width:'calc(100% - 28px)',
+      boxShadow:'0 4px 20px rgba(0,0,0,.5)', fontSize:'12px', color:'#b0c4de'
+    });
+    nudge.innerHTML = `<span style="font-size:20px">📲</span>
+      <span style="flex:1;line-height:1.4">Install <strong style="color:#f5a623">Tapasya</strong> for offline access</span>
+      <button id="install-yes" style="padding:6px 12px;border-radius:9px;border:none;background:#f5a623;color:#0d1520;font-weight:700;font-size:11px;cursor:pointer;white-space:nowrap">Install</button>
+      <button id="install-no" style="padding:6px 8px;border-radius:9px;border:1px solid #1e2f45;background:transparent;color:#4a5568;font-size:16px;cursor:pointer;line-height:1">×</button>`;
+    document.getElementById('app').appendChild(nudge);
+    document.getElementById('install-yes').addEventListener('click', () => {
+      _deferredInstall.prompt();
+      _deferredInstall.userChoice.then(() => { _deferredInstall = null; nudge.remove(); });
+    });
+    document.getElementById('install-no').addEventListener('click', () => nudge.remove());
+  }, 3000);
+});
+</script>
+</body>
+</html>
